@@ -1,0 +1,162 @@
+import React, { useState } from "react";
+import { BasketballIcon, SunIcon, MoonIcon, SlidersIcon, ChartIcon, EyeIcon, UserIcon, LogOutIcon } from "./icons";
+import SaveStatusIndicator from "./SaveStatusIndicator";
+
+export default function Header({
+  user,
+  onSignOut,
+  setPage,
+  theme,
+  toggleTheme,
+  admins = [],
+  viewers = [],
+  page,
+  liveGameId,
+  goToLiveGame,
+  openSettingsModal,
+}) {
+  const [showNavigateConfirm, setShowNavigateConfirm] = useState(false);
+
+  // Determine live status (hasLive)
+  const hasLive = !!liveGameId;
+
+  // Helper for mobile: expand/collapse header icons
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <header className="sticky top-0 z-30 w-full bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 py-2 shadow-sm">
+      {/* Left: App title and presence */}
+      <div className="flex items-center gap-2">
+        <span
+          className="text-xl font-bold text-orange-500 cursor-pointer select-none"
+          onClick={() => setPage("dashboard")}
+        >
+<BasketballIcon className="h-7 w-7 text-orange-500 animate-spin-slow" />
+          <h1 className="text-xl font-bold text-orange-500 ml-2">Sahil's Stats</h1>        
+</span>
+        {/* Live Game Indicator */}
+        <button
+          title="View Live Game"
+          className={`ml-2 flex items-center gap-1 px-2 py-1 rounded-full transition 
+            ${hasLive
+              ? "bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 animate-pulse cursor-pointer"
+              : "bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
+            }`}
+          disabled={!hasLive}
+          onClick={() => {
+            if (!hasLive) return;
+            // If admin/scorer, confirm before navigating
+            if (page === "live_admin") setShowNavigateConfirm(true);
+            else goToLiveGame();
+          }}
+        >
+          <span
+            className={`w-2 h-2 rounded-full mr-1 ${hasLive
+              ? "bg-red-500 animate-pulse"
+              : "bg-gray-400"
+            }`}
+          />
+          <span className="font-semibold text-xs tracking-wide">
+            LIVE
+          </span>
+        </button>
+        {/* Presence icons */}
+        <div className="flex items-center ml-4 gap-2">
+          <span className="flex items-center gap-1 text-gray-400 dark:text-gray-300 text-xs">
+            <EyeIcon className="w-4 h-4" />
+            {viewers.length || 0}
+          </span>
+          <span className="flex items-center gap-1 text-gray-400 dark:text-gray-300 text-xs">
+            <UserIcon className="w-4 h-4" />
+            {admins.length || 0}
+          </span>
+        </div>
+      </div>
+
+      {/* Right: Icons (responsive collapse on mobile) */}
+      <div className="flex items-center gap-2">
+        {/* Chevron for expand/collapse icons on mobile */}
+        <button
+          className="sm:hidden px-2 py-1"
+          onClick={() => setExpanded((e) => !e)}
+        >
+          <svg
+            className={`w-6 h-6 transition-transform ${expanded ? "rotate-90" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              d="M9 5l7 7-7 7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        <div className={`flex items-center gap-2 ${expanded ? "" : "hidden sm:flex"}`}>
+          {/* Settings (Sliders) */}
+          <button
+            title="Settings"
+            onClick={openSettingsModal}
+            className="flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2"
+          >
+            <SlidersIcon className="h-6 w-6" />
+          </button>
+          {/* Dashboard */}
+          <button
+            onClick={() => setPage("dashboard")}
+            title="Dashboard"
+            className="flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2"
+          >
+            <ChartIcon className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Sign Out */}
+        {user && (
+          <button
+            onClick={onSignOut}
+            className="bg-red-500 hover:bg-red-600 text-white rounded-lg p-2 flex items-center justify-center"
+            title="Sign out"
+          >
+            <LogOutIcon className="w-6 h-6" />
+          </button>
+        )}
+      </div>
+
+      {/* Leave Scoring and View Live Game modal */}
+      {showNavigateConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm w-full mx-4">
+            <h3 className="text-lg font-bold mb-4 text-red-500">
+              Leave Scoring and View Live Game?
+            </h3>
+            <p className="mb-6">
+              Leave the scoring screen to view the live game? You can return to scoring anytime.
+            </p>
+            <div className="flex gap-4 justify-end">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700"
+                onClick={() => setShowNavigateConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-500 text-white font-bold"
+                onClick={() => {
+                  setShowNavigateConfirm(false);
+                  goToLiveGame();
+                }}
+              >
+                Go to Live Game
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}
+

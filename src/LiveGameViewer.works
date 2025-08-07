@@ -1,0 +1,135 @@
+import React, { useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { BasketballIcon } from "./icons";
+import { rtdb } from "./firebase"; // import rtdb
+import { setPresence, listenPresence, removePresence } from "./presence"; // create presence.js as above
+import { ref, onValue, set, onDisconnect, remove } from "firebase/database";
+
+
+
+export default function LiveGameViewer({ db, gameId, appId, user }) {
+  const [game, setGame] = useState(null);
+  const [error, setError] = useState(null);
+
+
+  useEffect(() => {
+    if (!user || !gameId) return;
+    setPresence(user, "viewer", gameId);
+    return () => removePresence(user, "viewer", gameId);
+  }, [user, gameId]);
+
+
+  useEffect(() => {
+    if (!db || !gameId) return;
+    const gameRef = doc(db, "liveGames", gameId);
+    const unsub = onSnapshot(gameRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setGame(docSnap.data());
+      } else {
+        setError("This game is no longer live.");
+      }
+    });
+    return () => unsub();
+  }, [db, gameId, appId]);
+
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto text-center p-8 bg-white dark:bg-gray-800 rounded-xl">
+        <BasketballIcon className="hover:animate-spin-slow transition-transform" />
+        <h2 className="text-2xl font-bold text-red-500 mt-4">Game Not Found</h2>
+        <p className="text-gray-600 dark:text-gray-300 mt-2">{error}</p>
+      </div>
+    );
+  }
+
+
+const [viewers, setViewers] = useState([]);
+useEffect(() => {
+  if (!user || !gameId) return;
+  //const presenceRef = setPresence(rtdb, "global", user, "viewers");
+  
+  const off = listenPresence(rtdb, "global", user, "viewers");
+  return () => {
+    removePresence(rtdb, "global", user, "viewers");
+    if (typeof off === "function") off();
+  };
+}, [user, gameId]);
+
+
+  if (!game) {
+    return <div className="text-center p-10">Loading Live Game...</div>;
+  }
+
+  // Use playerStats as source of truth for Sahil's stats
+  const sahil = (game.playerStats || game.sahilStats || {});
+
+  // --- Compute points dynamically ---
+  const points =
+    (Number(sahil.fg2m) || 0) * 2 +
+    (Number(sahil.fg3m) || 0) * 3 +
+    (Number(sahil.ftm) || 0);
+
+  const statCards = [
+    { label: "Points", value: points },
+    { label: "2PT Made", value: sahil.fg2m ?? 0 },
+    { label: "2PT Attempted", value: sahil.fg2a ?? 0 },
+    { label: "3PT Made", value: sahil.fg3m ?? 0 },
+    { label: "3PT Attempted", value: sahil.fg3a ?? 0 },
+    { label: "FT Made", value: sahil.ftm ?? 0 },
+    { label: "FT Attempted", value: sahil.fta ?? 0 },
+    { label: "Assists", value: sahil.assists ?? 0 },
+    { label: "Rebounds", value: sahil.rebounds ?? 0 },
+    { label: "Steals", value: sahil.steals ?? 0 },
+    { label: "Fouls", value: sahil.fouls ?? 0 },
+    // Add more stats as needed
+  ];
+
+  const formatTime = (seconds) =>
+    `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const periodName = game.gameFormat === "halves" ? "Half" : "Period";
+
+  return (
+    <div className="max-w-md mx-auto space-y-4">
+      <h1 className="text-3xl font-bold text-center text-orange-500">Live Game</h1>
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
+        <div className="flex justify-around items-center text-center">
+          <div className="w-1/3">
+            <h3 className="text-xl md:text-2xl font-bold truncate">{game.teamNam}</h3>
+            <p className="text-5xl md:text-7xl font-mono">{game.homeScore}</p>
+          </div>
+          <div className="w-1/3">
+            <p className="text-4xl font-mono tracking-wider">{formatTime(game.clock)}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{periodName} {game.period}</p>
+          </div>
+          <div className="w-1/3">
+            <h3 className="text-xl md:text-2xl font-bold truncate">{game.opponent}</h3>
+            <p className="text-5xl md:text-7xl font-mono">{game.awayScore}</p>
+          </div>
+        </div>
+      </div>
+      <div className="text-center text-gray-500 dark:text-gray-400 text-sm">
+        <p>You are viewing a live game. The score and stats update automatically.</p>
+      </div>
+
+      {/* --- SAHIL LIVE STATS CARD --- */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div className="mb-2 flex items-center gap-2">
+          <BasketballIcon className="text-orange-500 h-5 w-5 animate-spin-slow" />
+          <span className="font-bold text-orange-500 text-lg">Sahil's Live Stats</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {statCards.map(card => (
+            <div
+              key={card.label}
+              className="bg-gray-100 dark:bg-gray-900 rounded-lg p-3 flex flex-col items-center"
+            >
+              <span className="text-xs text-orange-500 font-semibold">{card.label}</span>
+              <span className="text-xl font-bold text-gray-900 dark:text-gray-100">{card.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+

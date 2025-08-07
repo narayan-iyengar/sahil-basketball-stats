@@ -1,0 +1,419 @@
+import React, { useEffect, useState, useCallback } from "react";
+import { auth, db, rtdb, provider } from "./firebase";
+import {
+  collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot,
+} from "firebase/firestore";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import GameSetup from "./GameSetup";
+import Dashboard from "./Dashboard";
+import Header from "./Header";
+import AuthScreen from "./AuthScreen";
+import LiveGameAdmin from "./LiveGameAdmin";
+import LiveGameViewer from "./LiveGameViewer";
+import Settings from "./Settings";
+import { listenPresence, setPresence, removePresence } from "./presence";
+
+export default function App() {
+  // Auth & User
+  const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState("light");
+  const [loading, setLoading] = useState(true);
+  const [liveGameLoading, setLiveGameLoading] = useState(true);
+
+  // App State
+  const [page, setPage] = useState("game_setup");
+  const [teams, setTeams] = useState([]);
+  const [games, setGames] = useState([]);
+  const [stats, setStats] = useState([]);
+  const [liveGameId, setLiveGameId] = useState(null);
+
+  // Game setup global settings
+  const [globalGameFormat, setGlobalGameFormat] = useState("periods");
+  const [globalPeriodLength, setGlobalPeriodLength] = useState(10);
+  const [globalNumPeriods, setGlobalNumPeriods] = useState(4);
+
+  // Presence State
+  const [admins, setAdmins] = useState([]);
+  const [viewers, setViewers] = useState([]);
+
+  // --- AUTH LOGIC ---
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+      if (!u) {
+        removePresence(user, "viewer", liveGameId);
+        removePresence(user, "admin", liveGameId);
+      }
+    });
+    return unsub;
+    // eslint-disable-next-line
+  }, []);
+
+  // --- THEME LOGIC ---
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+  const toggleTheme = useCallback(() => setTheme((t) => (t === "dark" ? "light" : "dark")), []);
+
+  // --- DATA LOADERS ---
+  useEffect(() => {
+    if (!user) return;
+    const teamsCol = collection(db, "teams");
+    const unsub = onSnapshot(teamsCol, (snap) => {
+      setTeams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    const gamesCol = collection(db, "games");
+    const unsub = onSnapshot(gamesCol, (snap) => {
+      const gamesArr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setGames(gamesArr);
+    });
+    return unsub;
+  }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    const statsCol = collection(db, "stats");
+    const unsub = onSnapshot(statsCol, (snap) => {
+      setStats(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [user]);
+
+  // --- PRESENCE LOGIC ---
+  useEffect(() => {
+    if (!user) return;
+    setPresence(user, "admin");
+    const unsub = listenPresence("admin", null, (arr) => setAdmins(arr || []));
+    return () => {
+      removePresence(user, "admin");
+      if (unsub && typeof unsub === "function") unsub();
+    };
+  }, [user]);
+  useEffect(() => {
+    const unsub = listenPresence("viewer", null, (arr) => setViewers(arr || []));
+    return () => {
+      if (unsub && typeof unsub === "function") unsub();
+    };
+  }, []);
+
+  // --- LIVE GAME ID TRACKER ---
+  useEffect(() => {
+    setLiveGameLoading(true);
+    const liveGamesCol = collection(db, "liveGames");
+    const unsub = onSnapshot(liveGamesCol, (snap) => {
+      if (!snap.empty) {
+        setLiveGameId(snap.docs[0].id);
+      } else {
+        setLiveGameId(null);
+      }
+      setLiveGameLoading(false);
+    });
+    return () => unsub();
+    // eslint-disable-next-line
+  }, [page]);
+
+  // --- LIVE PAGE REDIRECT (Anonymous Viewer) ---
+  useEffect(() => {
+    if (!user && liveGameId && page !== "live_viewer") {
+      setPage("live_viewer");
+    }
+  }, [user, liveGameId, page]);
+
+  // --- CRUD CALLBACKS ---
+  const handleDeleteTeam = useCallback(async (teamId) => {
+    await deleteDoc(doc(db, "teams", teamId));
+    setTeams((teams) => teams.filter((t) => t.id !== teamId));
+  }, []);
+  const handleAddTeam = async (teamName) => {
+    const exists = teams.some((team) => team.name.toLowerCase() === teamName.toLowerCase());
+    if (exists) return null;
+    const docRef = await addDoc(collection(db, "teams"), { name: teamName });
+    setTeams((t) => [...t, { name: teamName, id: docRef.id }]);
+    return { name: teamName, id: docRef.id };
+  };
+  const handleAddGame = useCallback(async (game) => {
+    const docRef = await addDoc(collection(db, "games"), game);
+    setGames((g) => [...g, { ...game, id: docRef.id }]);
+  }, []);
+  const handleAddStat = useCallback(async (stat) => {
+    const docRef = await addDoc(collection(db, "stats"), stat);
+    setStats((s) => [...s, { ...stat, id: docRef.id }]);
+  }, []);
+  const handleDeleteGame = useCallback(async (gameId) => {
+    await deleteDoc(doc(db, "games", gameId));
+    setGames((g) => g.filter((x) => x.id !== gameId));
+    setStats((s) => s.filter((x) => x.gameId !== gameId));
+  }, []);
+
+  // --- END GAME LOGIC ---
+  const handleEndGame = async (liveGameId) => {
+    try {
+      const liveGameRef = doc(db, "liveGames", liveGameId);
+      const liveGameSnap = await getDoc(liveGameRef);
+      if (!liveGameSnap.exists()) {
+        console.log("Live game not found for endGame, id:", liveGameId);
+        return;
+      }
+      const gameData = liveGameSnap.data();
+      const playerStats = gameData.playerStats || {};
+      const myTeamScore = gameData.homeScore ?? 0;
+      const opponentScore = gameData.awayScore ?? 0;
+      let outcome = "T";
+      if (myTeamScore > opponentScore) outcome = "W";
+      else if (myTeamScore < opponentScore) outcome = "L";
+      const finalGame = {
+        ...gameData,
+        myTeamScore,
+        opponentScore,
+        outcome,
+        points: (playerStats.fg2m ?? 0) * 2 +
+          (playerStats.fg3m ?? 0) * 3 +
+          (playerStats.ftm ?? 0) * 1,
+        fg2m: playerStats.fg2m ?? 0,
+        fg2a: playerStats.fg2a ?? 0,
+        fg3m: playerStats.fg3m ?? 0,
+        fg3a: playerStats.fg3a ?? 0,
+        ftm: playerStats.ftm ?? 0,
+        fta: playerStats.fta ?? 0,
+        rebounds: playerStats.rebounds ?? 0,
+        assists: playerStats.assists ?? 0,
+        steals: playerStats.steals ?? 0,
+        blocks: playerStats.blocks ?? 0,
+        fouls: playerStats.fouls ?? 0,
+        turnovers: playerStats.turnovers ?? 0,
+        endedAt: new Date().toISOString(),
+        status: "final",
+        isRunning: false
+      };
+      const docRef = await addDoc(collection(db, "games"), finalGame);
+      await deleteDoc(liveGameRef);
+      setLiveGameId(null);
+      setPage("game_setup");
+      const gamesCol = collection(db, "games");
+      const snap = await getDocs(gamesCol);
+      setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error("Failed to save/end game:", err);
+    }
+  };
+
+  // --- DELETE ALL LIVE GAMES ---
+  const handleDeleteAllLiveGames = async () => {
+    const liveGamesCol = collection(db, "liveGames");
+    const snap = await getDocs(liveGamesCol);
+    for (let docu of snap.docs) {
+      await deleteDoc(doc(db, "liveGames", docu.id));
+    }
+    setLiveGameId(null);
+  };
+
+  // --- NAV HELPERS ---
+  const handleSignIn = async () => {
+    await signInWithPopup(auth, provider);
+  };
+  const handleSignOut = async () => {
+    removePresence(user, "viewer", liveGameId);
+    removePresence(user, "admin", liveGameId);
+    await signOut(auth);
+    setPage("game_setup");
+  };
+
+  // Handle new game (setup new or live)
+  const handleSubmitGame = async (config, mode) => {
+    const newGame = {
+      ...config,
+      createdBy: user?.uid || null,
+      createdAt: new Date().toISOString(),
+      status: mode === "live" ? "live" : "final",
+      playerStats: {
+        fg2m: 0, fg2a: 0,
+        fg3m: 0, fg3a: 0,
+        ftm: 0, fta: 0,
+        rebounds: 0, assists: 0, steals: 0,
+        blocks: 0, fouls: 0, turnovers: 0,
+      },
+      homeScore: 0,
+      awayScore: 0,
+      isRunning: false,
+      clock: (config.periodLength ? config.periodLength * 60 : 600),
+      period: 1,
+      gameFormat: config.gameFormat || globalGameFormat,
+      periodLength: config.periodLength || globalPeriodLength,
+      numPeriods: config.numPeriods || globalNumPeriods,
+    };
+    if (mode === "live") {
+      const docRef = await addDoc(collection(db, "liveGames"), newGame);
+      setLiveGameId(docRef.id);
+      setPage("live_admin");
+    } else {
+      const docRef = await addDoc(collection(db, "games"), newGame);
+      setGames((g) => [...g, { ...newGame, id: docRef.id }]);
+      setPage("dashboard");
+    }
+  };
+
+  // --- PAGE RENDER LOGIC ---
+  if (loading || liveGameLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+        <span className="text-orange-500 font-bold text-3xl animate-spin-slow">🏀</span>
+        <span className="ml-4">Loading App...</span>
+      </div>
+    );
+  }
+
+  // Show live game *anonymously* if available and not authenticated (force redirect for viewers only, not admins)
+  if (!user && page === "live_viewer") {
+    if (liveGameId) {
+      return (
+        <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
+          <Header
+            user={null}
+            db={db}
+            onSignOut={handleSignOut}
+            setPage={setPage}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            admins={admins}
+            viewers={viewers}
+            page={page}
+            liveGameId={liveGameId}
+            goToLiveGame={() => setPage("live_viewer")}
+            onDeleteAllLiveGames={handleDeleteAllLiveGames}
+          />
+          <main className="flex-1">
+            <LiveGameViewer
+              db={db}
+              user={null}
+              gameId={liveGameId}
+              setPage={setPage}
+              teams={teams}
+              stats={stats}
+              games={games}
+            />
+          </main>
+        </div>
+      );
+    } else {
+      return (
+        <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
+          <Header
+            user={null}
+            db={db}
+            onSignOut={handleSignOut}
+            setPage={setPage}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            admins={admins}
+            viewers={viewers}
+            page={page}
+            liveGameId={liveGameId}
+            goToLiveGame={() => setPage("live_viewer")}
+            onDeleteAllLiveGames={handleDeleteAllLiveGames}
+          />
+          <main className="flex-1 flex items-center justify-center">
+            <div className="text-2xl text-gray-400 text-center">
+              No live game in progress.
+            </div>
+          </main>
+        </div>
+      );
+    }
+  }
+
+  // Show login screen if not authenticated, and NOT a live viewer
+  if (!user && page !== "live_viewer") {
+    return <AuthScreen onSignIn={handleSignIn} />;
+  }
+
+  // Only show Dashboard, setup, etc if authenticated!
+  return (
+    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
+      <Header
+        user={user}
+        db={db}
+        onSignOut={handleSignOut}
+        setPage={setPage}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        admins={admins}
+        viewers={viewers}
+        page={page}
+        liveGameId={liveGameId}
+        goToLiveGame={() => setPage("live_viewer")}
+        onDeleteAllLiveGames={handleDeleteAllLiveGames}
+      />
+      <main className="flex-1">
+        {user && page === "game_setup" && (
+          <GameSetup
+            user={user}
+            teams={teams}
+            stats={games}
+            onAddTeam={handleAddTeam}
+            setPage={setPage}
+            games={games}
+            onAddGame={handleAddGame}
+            setLiveGameId={setLiveGameId}
+            onSubmit={handleSubmitGame}
+            gameFormat={globalGameFormat}
+            periodLength={globalPeriodLength}
+            numPeriods={globalNumPeriods}
+          />
+        )}
+        {user && page === "dashboard" && (
+          <Dashboard
+            user={user}
+            teams={teams}
+            games={games}
+            stats={games}
+            onDeleteGame={handleDeleteGame}
+            onDeleteTeam={handleDeleteTeam}
+            onAddTeam={handleAddTeam}
+          />
+        )}
+        {user && page === "live_admin" && liveGameId && (
+          <LiveGameAdmin
+            user={user}
+            db={db}
+            gameId={liveGameId}
+            setPage={setPage}
+            teams={teams}
+            stats={stats}
+            games={games}
+            onEndGame={handleEndGame}
+          />
+        )}
+        {user && page === "live_viewer" && liveGameId && (
+          <LiveGameViewer
+            db={db}
+            user={user}
+            gameId={liveGameId}
+            setPage={setPage}
+            teams={teams}
+            stats={stats}
+            games={games}
+          />
+        )}
+        {user && page === "settings" && (
+          <Settings
+            teams={teams}
+            onAddTeam={handleAddTeam}
+            onDeleteTeam={handleDeleteTeam}
+            gameFormat={globalGameFormat}
+            setGameFormat={setGlobalGameFormat}
+            periodLength={globalPeriodLength}
+            setPeriodLength={setGlobalPeriodLength}
+            numPeriods={globalNumPeriods}
+            setNumPeriods={setGlobalNumPeriods}
+            onDeleteAllLiveGames={handleDeleteAllLiveGames}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+

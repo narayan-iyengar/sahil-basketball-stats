@@ -1,0 +1,225 @@
+import React, { useState } from "react";
+import { ChevronRightIcon, EditIcon, TrashIcon } from "../icons";
+
+const statRows = [
+  [
+    { label: "2PT", keyMade: "fg2m", keyAtt: "fg2a", orange: true },
+    { label: "3PT", keyMade: "fg3m", keyAtt: "fg3a", orange: true },
+    { label: "FT", keyMade: "ftm", keyAtt: "fta", orange: true },
+  ],
+  [
+    { label: "REB", key: "rebounds" },
+    { label: "AST", key: "assists" },
+    { label: "STL", key: "steals" },
+    { label: "BLK", key: "blocks" },
+    { label: "FLS", key: "fouls" },
+    { label: "TO", key: "turnovers" },
+  ],
+];
+
+const orangeClass = "text-orange-500 font-bold";
+
+const GameHistory = ({ stats = [], onUpdateGame, onDeleteGame }) => {
+  const [expandedId, setExpandedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editData, setEditData] = useState({});
+
+  const toggleExpand = (id) =>
+    setExpandedId(expandedId === id ? null : id);
+
+  const startEdit = (game) => {
+    setEditingId(game.id);
+    setEditData({ ...game });
+    if (expandedId !== game.id) setExpandedId(game.id);
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = () => {
+    onUpdateGame(editingId, editData);
+    setEditingId(null);
+  };
+
+  const handleChange = (k, v) =>
+    setEditData((ed) => ({ ...ed, [k]: v === "" ? "" : Number(v) }));
+
+  return (
+    <div className="space-y-4">
+      {stats.map((game) => {
+        const expanded = expandedId === game.id;
+        const editing = editingId === game.id;
+
+        return (
+          <div
+            key={game.id}
+            className="bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
+          >
+            {/* COLLAPSED HEADER */}
+            <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleExpand(game.id)}>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-lg truncate">
+                  {new Date(game.timestamp).toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-300 truncate">
+                  {game.teamName} vs {game.opponent}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span
+                  className={`px-2 py-1 text-xs font-bold rounded-full ${
+                    game.outcome === "W"
+                      ? "bg-green-100 text-green-800"
+                      : game.outcome === "L"
+                      ? "bg-red-100 text-red-800"
+                      : "bg-gray-200 text-gray-800"
+                  }`}
+                >
+                  {game.outcome} {game.myTeamScore}-{game.opponentScore}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteGame(game.id);
+                  }}
+                  className="p-1 text-gray-400 hover:text-red-400 rounded-full transition"
+                  title="Delete Game"
+                >
+                  <TrashIcon />
+                </button>
+                <ChevronRightIcon className={expanded ? "rotate-90" : ""} />
+              </div>
+            </div>
+
+            {/* EXPANDED CONTENT */}
+            {expanded && (
+              <div className="p-4 border-t border-gray-200 dark:border-gray-600">
+                {/* GAME INFO ROW */}
+                <div className="flex flex-wrap gap-4 items-end justify-between mb-4">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {game.teamName} vs {game.opponent}
+                    </p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {game.myTeamScore} - {game.opponentScore}
+                    </p>
+                  </div>
+                  {/* Delete stays here in expanded too */}
+                  <button
+                    onClick={() => onDeleteGame(game.id)}
+                    className="p-1 text-gray-400 hover:text-red-400 rounded-full transition"
+                    title="Delete Game"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+
+                {/* STATS */}
+                {!editing ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-4 mb-2">
+                      {statRows[0].map((stat) => (
+                        <div key={stat.label} className="flex flex-col items-center">
+                          <span className={`text-sm ${orangeClass}`}>{stat.label}</span>
+                          <div className="flex gap-1 text-xs font-semibold">
+                            <span>
+                              {game[stat.keyMade] ?? 0}
+                              <span className="ml-1">made</span>
+                            </span>
+                            <span className="mx-1 text-gray-400">/</span>
+                            <span>
+                              {game[stat.keyAtt] ?? 0}
+                              <span className="ml-1">att</span>
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      {statRows[1].map((stat) => (
+                        <div key={stat.label} className="flex flex-col items-center">
+                          <span className={`text-sm ${orangeClass}`}>{stat.label}</span>
+                          <span className="font-semibold">{game[stat.key] ?? 0}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-4 mb-2">
+                      {statRows[0].map((stat) => (
+                        <div key={stat.label} className="flex flex-col items-center">
+                          <span className={`text-sm ${orangeClass}`}>{stat.label}</span>
+                          <div className="flex gap-1 text-xs font-semibold">
+                            <input
+                              type="number"
+                              value={editData[stat.keyMade] === "" ? "" : editData[stat.keyMade] ?? 0}
+                              onChange={(e) => handleChange(stat.keyMade, e.target.value)}
+                              placeholder="Made"
+                              className="border border-gray-300 dark:border-gray-600 rounded p-1 w-12 text-center"
+                            />
+                            <span className="mx-1 text-gray-400">/</span>
+                            <input
+                              type="number"
+                              value={editData[stat.keyAtt] === "" ? "" : editData[stat.keyAtt] ?? 0}
+                              onChange={(e) => handleChange(stat.keyAtt, e.target.value)}
+                              placeholder="Att"
+                              className="border border-gray-300 dark:border-gray-600 rounded p-1 w-12 text-center"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      {statRows[1].map((stat) => (
+                        <div key={stat.label} className="flex flex-col items-center">
+                          <span className={`text-sm ${orangeClass}`}>{stat.label}</span>
+                          <input
+                            type="number"
+                            value={editData[stat.key] === "" ? "" : editData[stat.key] ?? 0}
+                            onChange={(e) => handleChange(stat.key, e.target.value)}
+                            placeholder={stat.label}
+                            className="border border-gray-300 dark:border-gray-600 rounded p-1 w-12 text-center"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-end mt-4 gap-2">
+                      <button
+                        onClick={cancelEdit}
+                        className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={saveEdit}
+                        className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Edit Icon: bottom right */}
+                {!editing && (
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={() => startEdit(game)}
+                      className="p-2 text-gray-400 hover:text-red-400 rounded transition"
+                      title="Edit Game"
+                    >
+                      <EditIcon />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export default GameHistory;
+
