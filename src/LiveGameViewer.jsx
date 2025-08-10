@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { BasketballIcon } from "./icons";
 import { setPresence, listenPresence, removePresence } from "./presence";
@@ -15,31 +15,14 @@ function getAnonViewer() {
     mode: "viewer",
   };
 }
-/* OLD
-export default function LiveGameViewer({ db, gameId, appId, user }) {
-  const [game, setGame] = useState(null);
-  const [error, setError] = useState(null);
-  const [viewers, setViewers] = useState([]);
-
-  // Use logged-in user if available, else a guest user object
-  const presenceUser = user || getAnonViewer();
-
-  // Presence logic
-  useEffect(() => {
-    if (!gameId) return;
-    setPresence(presenceUser, "viewer", gameId);
-    const off = listenPresence("viewer", gameId, setViewers);
-    return () => {
-      removePresence(presenceUser, "viewer", gameId);
-      if (typeof off === "function") off();
-    };
-  }, [user, gameId]);
-*/
 
 export default function LiveGameViewer({ db, gameId, appId, user }) {
   const [game, setGame] = useState(null);
   const [error, setError] = useState(null);
   const [viewers, setViewers] = useState([]);
+  const [displayClock, setDisplayClock] = useState(0);
+  const [displayClockTenths, setDisplayClockTenths] = useState(0); // For tenths of seconds
+  const displayInterval = useRef(null);
 
   // Use logged-in user if available, else a guest user object
   const presenceUser = user || getAnonViewer();
@@ -68,19 +51,74 @@ export default function LiveGameViewer({ db, gameId, appId, user }) {
       document.removeEventListener("visibilitychange", cleanupPresence);
     };
   }, [user, gameId]);
+
   // Live game data logic
   useEffect(() => {
     if (!db || !gameId) return;
     const gameRef = doc(db, "liveGames", gameId);
     const unsub = onSnapshot(gameRef, (docSnap) => {
       if (docSnap.exists()) {
-        setGame(docSnap.data());
+        const data = docSnap.data();
+        setGame(data);
+        
+        // Calculate the current clock time based on server data
+        const now = Date.now();
+        if (data.isRunning && data.clockStartTime) {
+          const elapsedMs = now - data.clockStartTime;
+          const elapsedSeconds = Math.floor(elapsedMs / 1000);
+          const currentClock = Math.max(0, data.clockAtStart - elapsedSeconds);
+          const tenths = Math.max(0, (data.clockAtStart * 1000) - elapsedMs) / 100;
+          setDisplayClock(currentClock);
+          setDisplayClockTenths(tenths);
+        } else {
+          setDisplayClock(data.clock || 0);
+          setDisplayClockTenths((data.clock || 0) * 10);
+        }
       } else {
         setError("This game is no longer live.");
       }
     });
-    return () => unsub();
+    return () => {
+      unsub();
+      if (displayInterval.current) {
+        clearInterval(displayInterval.current);
+        displayInterval.current = null;
+      }
+    };
   }, [db, gameId, appId]);
+
+  // Display clock updater (for smooth countdown)
+  useEffect(() => {
+    if (!game) return;
+
+    if (game.isRunning && game.clockStartTime) {
+      // Update display more frequently when under 1 minute for tenths display
+      const updateInterval = displayClock <= 60 ? 100 : 1000; // 100ms vs 1000ms
+      
+      displayInterval.current = setInterval(() => {
+        const now = Date.now();
+        const elapsedMs = now - game.clockStartTime;
+        const elapsedSeconds = Math.floor(elapsedMs / 1000);
+        const currentClock = Math.max(0, game.clockAtStart - elapsedSeconds);
+        const tenths = Math.max(0, (game.clockAtStart * 1000) - elapsedMs) / 100;
+        
+        setDisplayClock(currentClock);
+        setDisplayClockTenths(tenths);
+      }, updateInterval);
+    } else {
+      if (displayInterval.current) {
+        clearInterval(displayInterval.current);
+        displayInterval.current = null;
+      }
+    }
+
+    return () => {
+      if (displayInterval.current) {
+        clearInterval(displayInterval.current);
+        displayInterval.current = null;
+      }
+    };
+  }, [game?.isRunning, game?.clockStartTime, game?.clockAtStart, displayClock]);
 
   if (error) {
     return (
@@ -117,9 +155,22 @@ export default function LiveGameViewer({ db, gameId, appId, user }) {
     { label: "Fouls", value: sahil.fouls ?? 0 },
   ];
 
-  const formatTime = (seconds) =>
-    `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const formatTime = (seconds, tenths) => {
+    if (seconds <= 59) {
+      // Under 1 minute: show "59.9" format
+      const wholeSeconds = Math.floor(tenths / 10);
+      const deciseconds = Math.floor(tenths % 10);
+      return `${wholeSeconds}.${deciseconds}`;
+    } else {
+      // Over 1 minute: show "1:30" format
+      return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+    }
+  };
   const periodName = game.gameFormat === "halves" ? "Half" : "Period";
+
+  // Clock styling for viewers too
+  const clockIsRed = displayClock <= 120;
+  const clockIsUrgent = displayClock <= 60 && displayClock > 0;
 
   return (
     <div className="max-w-md mx-auto space-y-4">
@@ -131,7 +182,15 @@ export default function LiveGameViewer({ db, gameId, appId, user }) {
             <p className="text-5xl md:text-7xl font-mono">{game.homeScore}</p>
           </div>
           <div className="w-1/3">
-            <p className="text-4xl font-mono tracking-wider">{formatTime(game.clock)}</p>
+            <p className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
+              clockIsUrgent 
+                ? 'text-red-500 animate-pulse scale-110 font-bold' 
+                : clockIsRed 
+                  ? 'text-red-500 animate-pulse' 
+                  : ''
+            }`}>
+              {formatTime(displayClock, displayClockTenths)}
+            </p>
             <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{periodName} {game.period}</p>
           </div>
           <div className="w-1/3">
@@ -172,4 +231,3 @@ export default function LiveGameViewer({ db, gameId, appId, user }) {
     </div>
   );
 }
-

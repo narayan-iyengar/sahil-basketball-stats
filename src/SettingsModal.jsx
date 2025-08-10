@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SunIcon,
   MoonIcon,
@@ -23,6 +23,24 @@ export default function SettingsModal({
 }) {
   const [newTeam, setNewTeam] = useState("");
   const [saveStatus, setSaveStatus] = useState(""); // "saving", "success", "error"
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedFormat = localStorage.getItem("gameFormat");
+    const savedLength = localStorage.getItem("periodLength");
+    
+    if (savedFormat && savedFormat !== gameFormat) {
+      setGameFormat(savedFormat);
+    }
+    if (savedLength && parseInt(savedLength) !== periodLength) {
+      setPeriodLength(parseInt(savedLength));
+    }
+  }, []);
+
+  // De-dupe teams by id (should not be needed if parent does it right)
+  const uniqueTeams = Array.from(
+    new Map(teams.map((t) => [t.id, t])).values()
+  );
 
   // Prevent duplicate teams by name (case insensitive)
   const handleAddTeam = async (name) => {
@@ -58,15 +76,18 @@ export default function SettingsModal({
     setTimeout(() => setSaveStatus(""), 1200);
   };
 
-  // Game format/length changes
+  // Game format/length changes with persistence
   const handleGameFormatChange = (format) => {
     setGameFormat(format);
+    localStorage.setItem("gameFormat", format);
     setSaveStatus("success");
     setTimeout(() => setSaveStatus(""), 1200);
   };
 
   const handlePeriodLengthChange = (val) => {
-    setPeriodLength(Number(val));
+    const length = Number(val);
+    setPeriodLength(length);
+    localStorage.setItem("periodLength", length.toString());
     setSaveStatus("success");
     setTimeout(() => setSaveStatus(""), 1200);
   };
@@ -98,11 +119,6 @@ export default function SettingsModal({
   };
 
   if (!open) return null;
-
-  // De-dupe teams by id (should not be needed if parent does it right)
-  const uniqueTeams = Array.from(
-    new Map(teams.map((t) => [t.id, t])).values()
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -221,4 +237,3 @@ export default function SettingsModal({
     </div>
   );
 }
-

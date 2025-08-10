@@ -1,14 +1,10 @@
 import React from "react";
-import SaveStatusIndicator from "./SaveStatusIndicator";
 
-export default function StatStepper({ label, value, onIncrement, onDecrement, saveStatus }) {
+export default function StatStepper({ label, value, onIncrement, onDecrement }) {
   return (
     <div className="flex flex-col items-center">
-      <label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center">
+      <label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
         {label}
-        <div className="w-4 h-4 ml-1">
-          <SaveStatusIndicator status={saveStatus} />
-        </div>
       </label>
       <div className="flex items-center justify-center gap-3">
         <button type="button" onClick={onDecrement} className="bg-red-500 hover:bg-red-600 w-8 h-8 rounded-full text-xl font-bold flex items-center justify-center shadow-md disabled:opacity-50 disabled:cursor-not-allowed" disabled={value <= 0}>-</button>
@@ -18,4 +14,3 @@ export default function StatStepper({ label, value, onIncrement, onDecrement, sa
     </div>
   );
 }
-

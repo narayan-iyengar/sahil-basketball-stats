@@ -1,24 +1,74 @@
 import React, { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { BasketballIcon } from "./icons";
-import { rtdb } from "./firebase"; // import rtdb
-import { setPresence, listenPresence, removePresence } from "./presence"; // create presence.js as above
-import { ref, onValue, set, onDisconnect, remove } from "firebase/database";
+import { setPresence, listenPresence, removePresence } from "./presence";
+import { v4 as uuidv4 } from "uuid";
 
+// Generate a random "anonymous" session id for non-logged-in viewers
+function getAnonViewer() {
+  const anonId = localStorage.getItem("anonViewerId") || uuidv4();
+  localStorage.setItem("anonViewerId", anonId);
+  return {
+    uid: anonId,
+    name: "Guest",
+    photoURL: "",
+    mode: "viewer",
+  };
+}
+/* OLD
+export default function LiveGameViewer({ db, gameId, appId, user }) {
+  const [game, setGame] = useState(null);
+  const [error, setError] = useState(null);
+  const [viewers, setViewers] = useState([]);
 
+  // Use logged-in user if available, else a guest user object
+  const presenceUser = user || getAnonViewer();
+
+  // Presence logic
+  useEffect(() => {
+    if (!gameId) return;
+    setPresence(presenceUser, "viewer", gameId);
+    const off = listenPresence("viewer", gameId, setViewers);
+    return () => {
+      removePresence(presenceUser, "viewer", gameId);
+      if (typeof off === "function") off();
+    };
+  }, [user, gameId]);
+*/
 
 export default function LiveGameViewer({ db, gameId, appId, user }) {
   const [game, setGame] = useState(null);
   const [error, setError] = useState(null);
+  const [viewers, setViewers] = useState([]);
 
+  // Use logged-in user if available, else a guest user object
+  const presenceUser = user || getAnonViewer();
 
+  // Presence logic (remove presence on tab close or page unload)
   useEffect(() => {
-    if (!user || !gameId) return;
-    setPresence(user, "viewer", gameId);
-    return () => removePresence(user, "viewer", gameId);
+    if (!gameId) return;
+    setPresence(presenceUser, "viewer", gameId);
+    const off = listenPresence("viewer", gameId, setViewers);
+
+    const cleanupPresence = () => {
+      removePresence(presenceUser, "viewer", gameId);
+    };
+
+    window.addEventListener("beforeunload", cleanupPresence);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        cleanupPresence();
+      }
+    });
+
+    return () => {
+      cleanupPresence();
+      if (typeof off === "function") off();
+      window.removeEventListener("beforeunload", cleanupPresence);
+      document.removeEventListener("visibilitychange", cleanupPresence);
+    };
   }, [user, gameId]);
-
-
+  // Live game data logic
   useEffect(() => {
     if (!db || !gameId) return;
     const gameRef = doc(db, "liveGames", gameId);
@@ -42,28 +92,12 @@ export default function LiveGameViewer({ db, gameId, appId, user }) {
     );
   }
 
-
-const [viewers, setViewers] = useState([]);
-useEffect(() => {
-  if (!user || !gameId) return;
-  //const presenceRef = setPresence(rtdb, "global", user, "viewers");
-  
-  const off = listenPresence(rtdb, "global", user, "viewers");
-  return () => {
-    removePresence(rtdb, "global", user, "viewers");
-    if (typeof off === "function") off();
-  };
-}, [user, gameId]);
-
-
   if (!game) {
     return <div className="text-center p-10">Loading Live Game...</div>;
   }
 
-  // Use playerStats as source of truth for Sahil's stats
+  // Sahil's stats
   const sahil = (game.playerStats || game.sahilStats || {});
-
-  // --- Compute points dynamically ---
   const points =
     (Number(sahil.fg2m) || 0) * 2 +
     (Number(sahil.fg3m) || 0) * 3 +
@@ -81,7 +115,6 @@ useEffect(() => {
     { label: "Rebounds", value: sahil.rebounds ?? 0 },
     { label: "Steals", value: sahil.steals ?? 0 },
     { label: "Fouls", value: sahil.fouls ?? 0 },
-    // Add more stats as needed
   ];
 
   const formatTime = (seconds) =>
@@ -94,7 +127,7 @@ useEffect(() => {
       <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
         <div className="flex justify-around items-center text-center">
           <div className="w-1/3">
-            <h3 className="text-xl md:text-2xl font-bold truncate">{game.teamNam}</h3>
+            <h3 className="text-xl md:text-2xl font-bold truncate">{game.teamName}</h3>
             <p className="text-5xl md:text-7xl font-mono">{game.homeScore}</p>
           </div>
           <div className="w-1/3">
@@ -110,7 +143,6 @@ useEffect(() => {
       <div className="text-center text-gray-500 dark:text-gray-400 text-sm">
         <p>You are viewing a live game. The score and stats update automatically.</p>
       </div>
-
       {/* --- SAHIL LIVE STATS CARD --- */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
         <div className="mb-2 flex items-center gap-2">
@@ -128,6 +160,14 @@ useEffect(() => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Show presence count */}
+      <div className="text-center mt-4 text-xs text-gray-500">
+        <span className="inline-flex items-center gap-1">
+          <span className="bg-green-400 rounded-full w-2 h-2 animate-pulse"></span>
+          {viewers.length} {viewers.length === 1 ? "viewer" : "viewers"} currently watching
+        </span>
       </div>
     </div>
   );
