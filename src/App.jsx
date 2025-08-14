@@ -10,13 +10,18 @@ import Header from "./Header";
 import AuthScreen from "./AuthScreen";
 import LiveGameAdmin from "./LiveGameAdmin";
 import LiveGameViewer from "./LiveGameViewer";
+import StatEntry from "./StatEntry"; // Import the unified stat entry component
 import { listenPresence, setPresence, removePresence } from "./presence";
 import SettingsModal from "./SettingsModal";
+import { PhotoUpload, PhotoThumbnails } from "./photo_system";
 
 export default function App() {
   // Auth & User
   const [user, setUser] = useState(null);
-  const [theme, setTheme] = useState("light");
+  const [theme, setTheme] = useState(() => {
+    // Load theme from localStorage with fallback
+    return localStorage.getItem("theme") || "light";
+  });
   const [loading, setLoading] = useState(true);
   const [liveGameLoading, setLiveGameLoading] = useState(true);
 
@@ -26,13 +31,18 @@ export default function App() {
   const [games, setGames] = useState([]);
   const [stats, setStats] = useState([]);
   const [liveGameId, setLiveGameId] = useState(null);
+  const [currentGameConfig, setCurrentGameConfig] = useState(null); // For stat entry
 
   // Settings Modal
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Game setup global settings
-  const [globalGameFormat, setGlobalGameFormat] = useState("halves");
-  const [globalPeriodLength, setGlobalPeriodLength] = useState(20);
+  const [globalGameFormat, setGlobalGameFormat] = useState(() => {
+    return localStorage.getItem("gameFormat") || "halves";
+  });
+  const [globalPeriodLength, setGlobalPeriodLength] = useState(() => {
+    return parseInt(localStorage.getItem("periodLength")) || 20;
+  });
   const [globalNumPeriods, setGlobalNumPeriods] = useState(2);
 
   // Presence State
@@ -57,6 +67,7 @@ export default function App() {
   // --- THEME LOGIC ---
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
+    localStorage.setItem("theme", theme);
   }, [theme]);
   const toggleTheme = useCallback(() => setTheme((t) => (t === "dark" ? "light" : "dark")), []);
 
@@ -128,6 +139,21 @@ export default function App() {
   }, [user, liveGameId, page]);
 
   // --- CRUD CALLBACKS ---
+
+const handleUpdateGamePhotos = async (gameId, photos) => {
+  try {
+    await updateDoc(doc(db, "games", gameId), { photos });
+    // Update local state
+    setGames((games) => 
+      games.map((game) => 
+        game.id === gameId ? { ...game, photos } : game
+      )
+    );
+  } catch (error) {
+    console.error("Error updating game photos:", error);
+  }
+};
+  // --- TEAM & GAME LOGIC ---
   const handleDeleteTeam = useCallback(async (teamId) => {
     await deleteDoc(doc(db, "teams", teamId));
     setTeams((teams) => teams.filter((t) => t.id !== teamId));
@@ -144,9 +170,33 @@ export default function App() {
     setGames((g) => [...g, { ...game, id: docRef.id }]);
   }, []);
   const handleAddStat = useCallback(async (stat) => {
-    const docRef = await addDoc(collection(db, "stats"), stat);
-    setStats((s) => [...s, { ...stat, id: docRef.id }]);
-  }, []);
+    // Calculate points from the stat data
+    const points = (stat.fg2m * 2) + (stat.fg3m * 3) + stat.ftm;
+    
+    // Determine outcome
+    let outcome = "T";
+    if (stat.myTeamScore > stat.opponentScore) outcome = "W";
+    else if (stat.myTeamScore < stat.opponentScore) outcome = "L";
+
+    // Create the final game record
+    const gameRecord = {
+      ...currentGameConfig,
+      ...stat,
+      points,
+      outcome,
+      status: "final",
+      createdAt: new Date().toISOString(),
+      adminName: user?.displayName ? user.displayName.split(" ")[0] : "",
+    };
+
+    const docRef = await addDoc(collection(db, "games"), gameRecord);
+    setGames((g) => [...g, { ...gameRecord, id: docRef.id }]);
+    
+    // Clear the config and return to dashboard
+    setCurrentGameConfig(null);
+    setPage("dashboard");
+  }, [currentGameConfig, user]);
+
   const handleDeleteGame = useCallback(async (gameId) => {
     await deleteDoc(doc(db, "games", gameId));
     setGames((g) => g.filter((x) => x.id !== gameId));
@@ -265,26 +315,25 @@ try {
       homeScore: 0,
       awayScore: 0,
       isRunning: false,
-      //clock: (config.periodLength ? config.periodLength * 60 : 600),
       clock: (globalPeriodLength ? globalPeriodLength * 60 : 600),
       period: 1,
-      gameFormat: globalGameFormat || "halves", // <- use setting
+      gameFormat: globalGameFormat || "halves",
       periodLength: globalPeriodLength || 20,
       numPeriods: globalGameFormat === "halves" ? 2 : 4,
-      //gameFormat: config.gameFormat || globalGameFormat,
-      //periodLength: config.periodLength || globalPeriodLength,
-      //numPeriods: config.numPeriods || globalNumPeriods,
     };
     if (mode === "live") {
       const docRef = await addDoc(collection(db, "liveGames"), newGame);
       setLiveGameId(docRef.id);
       setPage("live_admin");
     } else {
-      const docRef = await addDoc(collection(db, "games"), newGame);
-      setGames((g) => [...g, { ...newGame, id: docRef.id }]);
-      setPage("dashboard");
+      // For final games, set up the stat entry form
+      setCurrentGameConfig(newGame);
+      setPage("add_stat");
     }
   };
+
+
+
 
   // --- PAGE RENDER LOGIC ---
   if (loading || liveGameLoading) {
@@ -421,6 +470,18 @@ if (!user && page === "live_viewer") {
             onDeleteGame={handleDeleteGame}
             onDeleteTeam={handleDeleteTeam}
             onAddTeam={handleAddTeam}
+            onUpdateGamePhotos={handleUpdateGamePhotos} 
+          />
+        )}
+        {user && page === "add_stat" && currentGameConfig && (
+          <StatEntry
+            gameConfig={currentGameConfig}
+            isLive={false}
+            onSave={handleAddStat}
+            onCancel={() => {
+              setCurrentGameConfig(null);
+              setPage("game_setup");
+            }}
           />
         )}
         {user && page === "live_admin" && liveGameId && (
@@ -450,4 +511,3 @@ if (!user && page === "live_viewer") {
     </div>
   );
 }
-

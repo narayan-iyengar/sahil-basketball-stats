@@ -44,14 +44,22 @@ const StatStepper = ({ label, name, value, onChange }) => (
   </div>
 );
 
-export default function AddStatForm({ gameConfig, onAddStat, onCancel, isEditing = false, onUpdateStat }) {
+export default function AddStatForm({ gameConfig, onAddStat, onCancel, isEditing = false, onUpdateStat, stats = [] }) {
   const [formData, setFormData] = useState(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  // Get unique locations from previous games
+  const uniqueLocations = useMemo(() => {
+    const locationSet = new Set(stats.map((s) => s.location).filter(Boolean));
+    return [...locationSet];
+  }, [stats]);
 
   useEffect(() => {
     if (gameConfig) {
       setFormData({
         myTeamScore: gameConfig.myTeamScore || 0,
         opponentScore: gameConfig.opponentScore || 0,
+        location: gameConfig.location || "",
         fg2m: gameConfig.fg2m || 0,
         fg2a: gameConfig.fg2a || 0,
         fg3m: gameConfig.fg3m || 0,
@@ -78,8 +86,72 @@ export default function AddStatForm({ gameConfig, onAddStat, onCancel, isEditing
     setFormData((prev) => ({ ...prev, [name]: parseInt(value, 10) || 0 }));
   };
 
+  const handleTextInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleStepperChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const getAutoLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          
+          // Use Google Places API if available, otherwise fallback
+          const googleApiKey = process.env.REACT_APP_GOOGLE_PLACES_API_KEY;
+          
+          if (googleApiKey && googleApiKey !== 'YOUR_API_KEY_HERE') {
+            try {
+              const placesResponse = await fetch(
+                `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=2000&type=gym&keyword=basketball|recreation|sports|center&key=${googleApiKey}`
+              );
+              const placesData = await placesResponse.json();
+              
+              if (placesData.results && placesData.results.length > 0) {
+                const closestPlace = placesData.results[0];
+                setFormData((prev) => ({ ...prev, location: closestPlace.name }));
+                setIsGettingLocation(false);
+                return;
+              }
+            } catch (error) {
+              console.error("Google Places API error:", error);
+            }
+          }
+          
+          // Fallback to reverse geocoding
+          const response = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+          );
+          const data = await response.json();
+          const locationName = data.locality || data.city || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+          setFormData((prev) => ({ ...prev, location: locationName }));
+          setIsGettingLocation(false);
+        } catch (error) {
+          console.error("Error getting location name:", error);
+          setFormData((prev) => ({ 
+            ...prev, 
+            location: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}` 
+          }));
+          setIsGettingLocation(false);
+        }
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        alert("Unable to get your location. Please enter manually.");
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    );
   };
 
   const handleSubmit = (e) => {
@@ -120,6 +192,53 @@ export default function AddStatForm({ gameConfig, onAddStat, onCancel, isEditing
           <div className="flex gap-8 justify-center">
             <StatInput label={gameConfig.teamName} name="myTeamScore" value={formData.myTeamScore} onChange={handleInputChange} />
             <StatInput label={gameConfig.opponent} name="opponentScore" value={formData.opponentScore} onChange={handleInputChange} />
+          </div>
+        </div>
+
+        {/* Location */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4 text-center">Game Location</h3>
+          <div className="max-w-md mx-auto space-y-2">
+            <div className="flex gap-2">
+              <select
+                name="location"
+                value={formData.location && uniqueLocations.includes(formData.location) ? formData.location : ""}
+                onChange={(e) => {
+                  if (e.target.value === "__ADD_NEW__") {
+                    setFormData((prev) => ({ ...prev, location: "" }));
+                  } else {
+                    setFormData((prev) => ({ ...prev, location: e.target.value }));
+                  }
+                }}
+                className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none flex-1"
+              >
+                <option value="">Select location...</option>
+                {uniqueLocations.map((location, index) => (
+                  <option key={index} value={location}>
+                    {location}
+                  </option>
+                ))}
+                <option value="__ADD_NEW__" className="font-bold border-t border-gray-300">
+                  + Add New Location
+                </option>
+              </select>
+              <button
+                type="button"
+                onClick={getAutoLocation}
+                disabled={isGettingLocation}
+                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded font-medium text-sm whitespace-nowrap"
+              >
+                {isGettingLocation ? "Getting..." : "Auto"}
+              </button>
+            </div>
+            <input
+              type="text"
+              name="location"
+              placeholder="Or type new location..."
+              value={formData.location}
+              onChange={handleTextInputChange}
+              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
+            />
           </div>
         </div>
 
@@ -205,4 +324,3 @@ export default function AddStatForm({ gameConfig, onAddStat, onCancel, isEditing
     </div>
   );
 }
-

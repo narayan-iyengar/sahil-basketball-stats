@@ -51,22 +51,16 @@ export default function Header({
   const LiveIndicator = (
     <button
       disabled={!hasLive}
-          className={`ml-2 flex items-center gap-1 px-2 py-1 font-semibold text-xs rounded-full transition
-            ${hasLive
-              ? "bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 animate-pulse cursor-pointer"
-              : "bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
-            }`}
-//      className={`flex items-center px-2 py-1 rounded font-semibold text-xs select-none
-//        ${hasLive
-//          ? "cursor-pointer text-red-600 hover:bg-red-100 dark:hover:bg-gray-800"
-//          : "text-gray-400 cursor-not-allowed"}
-//      `}
-//      style={{ outline: "none", border: "none", background: "none" }}
+      className={`flex items-center gap-1 px-3 py-1.5 font-semibold text-sm rounded-full transition-all
+        ${hasLive
+          ? "bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 animate-pulse cursor-pointer hover:bg-red-200 dark:hover:bg-red-800"
+          : "bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
+        }`}
       onClick={handleLiveClick}
       title={hasLive ? "Watch Live Game" : "No Live Game In Progress"}
     >
       <BlinkingDot active={hasLive} />
-      <span className="hidden sm:inline">Live</span>
+      <span className="font-bold tracking-wide">LIVE</span>
     </button>
   );
 
@@ -85,71 +79,54 @@ export default function Header({
 
   return (
     <header className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm sticky top-0 z-20 border-b border-gray-200 dark:border-gray-700">
-      <div
-        className="
-          max-w-6xl
-          mx-auto
-          flex
-          items-center
-          justify-between
-          px-2 sm:px-4
-          py-2 sm:py-4
-          gap-1 sm:gap-8
-        "
-      >
-        {/* Logo and Title */}
+      <div className="max-w-6xl mx-auto grid grid-cols-3 items-center px-2 sm:px-4 py-2 sm:py-4 gap-4">
+        {/* Left: Logo */}
         <div
-          className="flex items-center min-w-0 cursor-pointer"
+          className="flex items-center cursor-pointer justify-start"
           onClick={() => setPage("game_setup")}
         >
-          <BasketballIcon className="h-6 w-6 sm:h-7 sm:w-7 text-orange-500 animate-spin-slow" />
-          <h1 className="ml-1 sm:ml-2 truncate text-lg sm:text-xl font-bold text-orange-500">
-            Sahil's Stats
-          </h1>
+          <BasketballIcon className="h-7 w-7 sm:h-8 sm:w-8 text-orange-500 animate-spin-slow hover:scale-110 transition-transform" />
         </div>
 
-        {/* Presence & Live */}
-        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+        {/* Center: Live Button */}
+        <div className="flex justify-center">
           {LiveIndicator}
-          <div className="flex items-center group relative">
-            <UserIcon className="w-5 h-5 text-blue-400 mr-0.5 sm:mr-1" />
-            <span className="text-xs text-gray-600 dark:text-gray-300 font-semibold">{admins.length}</span>
-            <div className="absolute top-full left-0 mt-2 p-2 rounded bg-white dark:bg-gray-900 shadow text-xs z-40 w-48 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200">
-              <b>Admins:</b>
-              {renderUserList(admins)}
-            </div>
-          </div>
-          <div className="flex items-center group relative">
-            <EyeIcon className="w-5 h-5 text-green-400 mr-0.5 sm:mr-1" />
-            <span className="text-xs text-gray-600 dark:text-gray-300 font-semibold">{viewers.length}</span>
-            <div className="absolute top-full left-0 mt-2 p-2 rounded bg-white dark:bg-gray-900 shadow text-xs z-40 w-48 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200">
-              <b>Viewers:</b>
-              {renderUserList(viewers)}
-            </div>
-          </div>
         </div>
-        
-        {/* Controls (Settings, Dashboard, Sign Out) */}
-        <div className="flex items-center gap-1 sm:gap-2">
+
+        {/* Right: Controls with Presence Indicators */}
+        <div className="flex items-center gap-1 sm:gap-2 justify-end">
           <button
-            title="Settings"
             onClick={openSettingsModal}
-            className="flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2"
+            className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all border-2 ${
+              admins.length === 0 
+                ? 'border-transparent' 
+                : admins.length === 1
+                ? 'border-blue-300 shadow-sm shadow-blue-300/30'
+                : admins.length === 2
+                ? 'border-blue-400 shadow-md shadow-blue-400/40'
+                : 'border-blue-500 shadow-lg shadow-blue-500/50'
+            }`}
           >
             <SlidersIcon className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
           <button
             onClick={() => setPage("dashboard")}
-            className="flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2"
-            title="Dashboard"
+            className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all border-2 ${
+              viewers.length === 0 
+                ? 'border-transparent' 
+                : viewers.length === 1
+                ? 'border-green-300 shadow-sm shadow-green-300/30'
+                : viewers.length <= 3
+                ? 'border-green-400 shadow-md shadow-green-400/40'
+                : 'border-green-500 shadow-lg shadow-green-500/50'
+            }`}
           >
             <ChartIcon className="h-5 w-5" />
           </button>
           {user ? (
             <button
               onClick={onSignOut}
-              className="bg-red-500 hover:bg-red-600 text-white rounded-lg p-2 flex items-center justify-center"
-              title="Sign Out"
+              className="bg-red-500 hover:bg-red-600 text-white rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all"
             >
               <LogOutIcon className="h-5 w-5" />
             </button>
@@ -157,16 +134,14 @@ export default function Header({
             onSignIn && (
               <button
                 onClick={onSignIn}
-                className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-2 flex items-center justify-center"
-                title="Sign In"
+                className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all"
               >
                 <UserIcon className="h-5 w-5" />
               </button>
             )
           )}
-      </div>
+        </div>
       </div>
     </header>
   );
 }
-

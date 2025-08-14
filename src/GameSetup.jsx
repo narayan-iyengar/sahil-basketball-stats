@@ -15,8 +15,6 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
     }),
   });
   const [error, setError] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
-
   const uniqueTeams = useMemo(() => {
     // De-dupe by id and name (just in case)
     const map = new Map();
@@ -29,7 +27,7 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
   }, [teams]);
 
   const uniqueOpponents = useMemo(() => {
-    const opponentSet = new Set(stats.map((s) => s.opponent));
+    const opponentSet = new Set(stats.map((s) => s.opponent).filter(Boolean));
     return [...opponentSet];
   }, [stats]);
 
@@ -42,20 +40,20 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
   const handleOpponentChange = (e) => {
     const value = e.target.value;
     setConfig((prev) => ({ ...prev, opponent: value }));
-    if (value) {
-      const filteredSuggestions = uniqueOpponents.filter((opp) =>
-        opp.toLowerCase().includes(value.toLowerCase())
-      );
-      setSuggestions(filteredSuggestions);
-    } else {
-      setSuggestions([]);
-    }
   };
 
-  const handleSuggestionClick = (opponentName) => {
-    setConfig((prev) => ({ ...prev, opponent: opponentName }));
-    setSuggestions([]);
-  };
+  // Check if current opponent exists in database
+  const opponentExists = uniqueOpponents.some(
+    (opp) => opp.toLowerCase() === config.opponent.toLowerCase()
+  );
+
+  // Find close matches for suggestions
+  const suggestedOpponent = uniqueOpponents.find(
+    (opp) => 
+      config.opponent.length >= 2 && 
+      opp.toLowerCase().includes(config.opponent.toLowerCase()) &&
+      opp.toLowerCase() !== config.opponent.toLowerCase()
+  );
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -97,9 +95,7 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
             name="teamName"
             value={config.teamName}
             onChange={handleChange}
-            //className="bg-gray-50 dark:bg-gray-700 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full border border-gray-300 dark:border-gray-600"
             className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-
           >
             <option value="" disabled>
               Select Team
@@ -111,7 +107,8 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
             ))}
           </select>
         </div>
-        <div className="relative">
+        
+        <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Opponent's Team
           </label>
@@ -121,24 +118,49 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
             placeholder="e.g., Oakland Soldiers"
             value={config.opponent}
             onChange={handleOpponentChange}
-            //className="bg-gray-50 dark:bg-gray-700 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full border border-gray-300 dark:border-gray-600"
             className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
             required
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck="false"
           />
-          {suggestions.length > 0 && (
-            <ul className="absolute z-10 w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md mt-1 max-h-40 overflow-y-auto">
-              {suggestions.map((suggestion, index) => (
-                <li
-                  key={index}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-500"
-                >
-                  {suggestion}
-                </li>
-              ))}
-            </ul>
+          {/* Status indicators */}
+          {config.opponent && (
+            <div className="mt-2 text-sm">
+              {opponentExists ? (
+                <div className="flex items-center text-green-600 dark:text-green-400">
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Played before
+                </div>
+              ) : suggestedOpponent ? (
+                <div className="flex items-center text-blue-600 dark:text-blue-400">
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  Did you mean: 
+                  <button
+                    type="button"
+                    onClick={() => setConfig(prev => ({ ...prev, opponent: suggestedOpponent }))}
+                    className="ml-1 text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300"
+                  >
+                    {suggestedOpponent}
+                  </button>
+                  ?
+                </div>
+              ) : (
+                <div className="flex items-center text-gray-500 dark:text-gray-400">
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  New opponent
+                </div>
+              )}
+            </div>
           )}
         </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -149,9 +171,8 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
               name="date"
               value={config.date}
               onChange={handleChange}
-              //className="bg-gray-50 dark:bg-gray-700 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full border border-gray-300 dark:border-gray-600"
-             className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-              />
+              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -162,9 +183,7 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
               name="time"
               value={config.time}
               onChange={handleChange}
-              //className="bg-gray-50 dark:bg-gray-700 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full border border-gray-300 dark:border-gray-600"
               className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-
             />
           </div>
         </div>
@@ -186,4 +205,3 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
     </div>
   );
 }
-

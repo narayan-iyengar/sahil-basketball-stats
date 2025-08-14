@@ -7,9 +7,15 @@ import { ShareIcon } from "./icons";
 import { setPresence, removePresence } from "./presence";
 import { db } from "./firebase";
 
+// Expandable bar icon
+const ExpandableBar = ({ isExpanded, className = "" }) => (
+  <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
+);
+
 export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
   const [game, setGame] = useState(null);
   const [shareMessage, setShareMessage] = useState("");
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
   const statKeys = [
     "fg2m", "fg2a", "fg3m", "fg3a", "ftm", "fta",
     "rebounds", "assists", "steals", "blocks", "fouls", "turnovers"
@@ -121,7 +127,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
     
     const isHalves = game.gameFormat === "halves";
     const maxPeriod = isHalves ? 2 : 4;
-    const isGameEnd = game.period === maxPeriod; // Changed from >= to ===
+    const isGameEnd = game.period === maxPeriod;
     
     if (isGameEnd) {
       // Game over - just pause clock, don't advance
@@ -254,7 +260,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
     const isHalves = game.gameFormat === "halves";
     const maxPeriod = isHalves ? 2 : 4;
     
-    if (game.period === maxPeriod) { // Changed from >= to ===
+    if (game.period === maxPeriod) {
       if (typeof onEndGame === "function") onEndGame(gameId);
     } else {
       const now = Date.now();
@@ -295,7 +301,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
   // Button logic
   const isHalves = game.gameFormat === "halves";
   const maxPeriod = isHalves ? 2 : 4;
-  const atFinalPeriod = game.period === maxPeriod; // Changed from >= to ===
+  const atFinalPeriod = game.period === maxPeriod;
   const gameEnded = atFinalPeriod && displayClock === 0 && !game.isRunning;
   
   const endButtonLabel = gameEnded
@@ -309,90 +315,150 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
   const clockIsUrgent = displayClock <= 60 && displayClock > 0;
 
   return (
-    <div className="max-w-md mx-auto space-y-4 pb-24">
+    <div className="h-screen flex flex-col">
       {/* Game ended notification */}
       {gameEnded && (
-        <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-600 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-lg text-center">
+        <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-600 text-yellow-800 dark:text-yellow-200 px-4 py-3 text-center">
           <strong>Game Over!</strong> Press "End Game" when ready to finish.
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 relative">
-        <div className="absolute top-2 right-2"><SaveStatusIndicator status={saveStatus} /></div>
-        <div className="flex justify-around items-center text-center">
-          <div className="w-1/3 flex flex-col items-center relative">
-            <span className="text-lg font-bold truncate text-center">{game.teamName}</span>
-            <div className="flex items-center">
-              <span className="text-5xl font-mono">{game.homeScore}</span>
+      {/* Fixed Score Section - doesn't scroll */}
+      <div className="flex-shrink-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="w-full max-w-md mx-auto p-4">
+          <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 relative">
+            <div className="absolute top-2 right-2"><SaveStatusIndicator status={saveStatus} /></div>
+            <div className="flex justify-around items-center text-center">
+              <div className="w-1/3 flex flex-col items-center relative">
+                <span className="text-lg font-bold truncate text-center">{game.teamName}</span>
+                <div className="flex items-center">
+                  <span className="text-5xl font-mono">{game.homeScore}</span>
+                </div>
+              </div>
+              <div className="w-1/3 flex flex-col items-center justify-center">
+                <span className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
+                  clockIsUrgent 
+                    ? 'text-red-500 animate-pulse scale-110 font-bold' 
+                    : clockIsRed 
+                      ? 'text-red-500 animate-pulse' 
+                      : ''
+                }`}>
+                  {formatTime(displayClock, displayClockTenths)}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 capitalize">{periodName} {game.period}</span>
+              </div>
+              <div className="w-1/3 flex flex-col items-center relative">
+                <span className="text-lg font-bold truncate text-center">{game.opponent}</span>
+                <div className="flex items-center">
+                  <span className="text-5xl font-mono">{game.awayScore}</span>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="w-1/3 flex flex-col items-center justify-center">
-            <span className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
-              clockIsUrgent 
-                ? 'text-red-500 animate-pulse scale-110 font-bold' 
-                : clockIsRed 
-                  ? 'text-red-500 animate-pulse' 
-                  : ''
-            }`}>
-              {formatTime(displayClock, displayClockTenths)}
-            </span>
-            <span className="text-sm text-gray-500 dark:text-gray-400 capitalize">{periodName} {game.period}</span>
-          </div>
-          <div className="w-1/3 flex flex-col items-center relative">
-            <span className="text-lg font-bold truncate text-center">{game.opponent}</span>
-            <div className="flex items-center">
-              <span className="text-5xl font-mono">{game.awayScore}</span>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 mt-3">
-          <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-1.5 rounded-lg">
-            <button onClick={() => handleScoreChange("home", -1)} className="bg-red-500 w-7 h-7 rounded-md text-lg font-bold disabled:opacity-50" disabled={game.homeScore <= 0}>-</button>
-            <span className="font-semibold text-sm px-1">{game.teamName}</span>
-            <button onClick={() => handleScoreChange("home", 1)} className="bg-green-500 w-7 h-7 rounded-md text-lg font-bold">+</button>
-          </div>
-          <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-1.5 rounded-lg">
-            <button onClick={() => handleScoreChange("away", -1)} className="bg-red-500 w-7 h-7 rounded-md text-lg font-bold disabled:opacity-50" disabled={game.awayScore <= 0}>-</button>
-            <span className="font-semibold text-sm px-1">{game.opponent}</span>
-            <button onClick={() => handleScoreChange("away", 1)} className="bg-green-500 w-7 h-7 rounded-md text-lg font-bold">+</button>
+           <div className="grid grid-cols-2 gap-3 mt-4">
+  <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">
+    <button 
+      onClick={() => handleScoreChange("home", -1)} 
+      className="bg-red-500 hover:bg-red-600 text-white w-9 h-9 text-lg font-bold flex items-center justify-center shadow-md disabled:opacity-50 transition-all active:scale-95" 
+      disabled={game.homeScore <= 0}
+    >
+      −
+    </button>
+    <span className="font-semibold text-sm px-2 text-center flex-1 text-gray-900 dark:text-white">
+      {game.teamName}
+    </span>
+    <button 
+      onClick={() => handleScoreChange("home", 1)} 
+      className="bg-green-500 hover:bg-green-600 text-white w-9 h-9  text-lg font-bold flex items-center justify-center shadow-md transition-all active:scale-95"
+    >
+      +
+    </button>
+  </div>
+  <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">
+    <button 
+      onClick={() => handleScoreChange("away", -1)} 
+      className="bg-red-500 hover:bg-red-600 text-white w-9 h-9  text-lg font-bold flex items-center justify-center shadow-md disabled:opacity-50 transition-all active:scale-95" 
+      disabled={game.awayScore <= 0}
+    >
+      −
+    </button>
+    <span className="font-semibold text-sm px-2 text-center flex-1 text-gray-900 dark:text-white">
+      {game.opponent}
+    </span>
+    <button 
+      onClick={() => handleScoreChange("away", 1)} 
+      className="bg-green-500 hover:bg-green-600 text-white w-9 h-9  text-lg font-bold flex items-center justify-center shadow-md transition-all active:scale-95"
+    >
+      +
+    </button>
+  </div>
+</div>
           </div>
         </div>
       </div>
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-bold text-center text-orange-500 mb-4">Sahil's Live Stats</h3>
-        <div className="space-y-4">
-          <StatStepperGroup label="2-Pointers" madeValue={playerStats.fg2m} attValue={playerStats.fg2a} onStatChange={handleStatChange} madeKey="fg2m" attKey="fg2a" />
-          <StatStepperGroup label="3-Pointers" madeValue={playerStats.fg3m} attValue={playerStats.fg3a} onStatChange={handleStatChange} madeKey="fg3m" attKey="fg3a" />
-          <StatStepperGroup label="Free Throws" madeValue={playerStats.ftm} attValue={playerStats.fta} onStatChange={handleStatChange} madeKey="ftm" attKey="fta" />
-        </div>
-        <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-          <StatStepper label="Rebounds" value={playerStats.rebounds} onIncrement={() => handleStatChange("rebounds", 1)} onDecrement={() => handleStatChange("rebounds", -1)} />
-          <StatStepper label="Assists" value={playerStats.assists} onIncrement={() => handleStatChange("assists", 1)} onDecrement={() => handleStatChange("assists", -1)} />
-          <StatStepper label="Steals" value={playerStats.steals} onIncrement={() => handleStatChange("steals", 1)} onDecrement={() => handleStatChange("steals", -1)} />
-          <StatStepper label="Blocks" value={playerStats.blocks} onIncrement={() => handleStatChange("blocks", 1)} onDecrement={() => handleStatChange("blocks", -1)} />
-          <StatStepper label="Fouls" value={playerStats.fouls} onIncrement={() => handleStatChange("fouls", 1)} onDecrement={() => handleStatChange("fouls", -1)} />
-          <StatStepper label="Turnovers" value={playerStats.turnovers} onIncrement={() => handleStatChange("turnovers", 1)} onDecrement={() => handleStatChange("turnovers", -1)} />
+
+      {/* Scrollable Stats Section */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="w-full max-w-md mx-auto p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
+            {/* Collapsible Header */}
+            <div className="flex flex-col items-center p-4 border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setStatsCollapsed(!statsCollapsed)}
+                className="flex flex-col items-center gap-2 w-full"
+              >
+                <ExpandableBar isExpanded={!statsCollapsed} />
+                <h3 className="text-lg font-bold text-orange-500">
+                  {statsCollapsed ? "Stats Collapsed" : "Live Stats"}
+                </h3>
+              </button>
+            </div>
+            
+            {/* Stats Content */}
+            {!statsCollapsed && (
+              <div className="p-4">
+                <div className="space-y-4">
+                  <StatStepperGroup label="2-Pointers" madeValue={playerStats.fg2m} attValue={playerStats.fg2a} onStatChange={handleStatChange} madeKey="fg2m" attKey="fg2a" />
+                  <StatStepperGroup label="3-Pointers" madeValue={playerStats.fg3m} attValue={playerStats.fg3a} onStatChange={handleStatChange} madeKey="fg3m" attKey="fg3a" />
+                  <StatStepperGroup label="Free Throws" madeValue={playerStats.ftm} attValue={playerStats.fta} onStatChange={handleStatChange} madeKey="ftm" attKey="fta" />
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 justify-items-center">
+                  <StatStepper label="Rebounds" value={playerStats.rebounds} onIncrement={() => handleStatChange("rebounds", 1)} onDecrement={() => handleStatChange("rebounds", -1)} />
+                  <StatStepper label="Assists" value={playerStats.assists} onIncrement={() => handleStatChange("assists", 1)} onDecrement={() => handleStatChange("assists", -1)} />
+                  <StatStepper label="Steals" value={playerStats.steals} onIncrement={() => handleStatChange("steals", 1)} onDecrement={() => handleStatChange("steals", -1)} />
+                  <StatStepper label="Blocks" value={playerStats.blocks} onIncrement={() => handleStatChange("blocks", 1)} onDecrement={() => handleStatChange("blocks", -1)} />
+                  <StatStepper label="Fouls" value={playerStats.fouls} onIncrement={() => handleStatChange("fouls", 1)} onDecrement={() => handleStatChange("fouls", -1)} />
+                  <StatStepper label="Turnovers" value={playerStats.turnovers} onIncrement={() => handleStatChange("turnovers", 1)} onDecrement={() => handleStatChange("turnovers", -1)} />
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Extra padding for bottom controls */}
+          <div className="h-20"></div>
         </div>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-3 border-t border-gray-200 dark:border-gray-700 z-10">
-        <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
-          <button onClick={handleShare} className="w-full py-3 rounded-lg font-bold text-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center">
-            {shareMessage ? shareMessage : <ShareIcon />}
-          </button>
-          <button
-            onClick={toggleClock}
-            className={`w-full py-3 rounded-lg font-bold text-lg ${game.isRunning ? "bg-yellow-500 text-black" : "bg-green-500 text-white"}`}
-            disabled={gameEnded}
-          >
-            {game.isRunning ? "Pause" : "Start"}
-          </button>
-          <button 
-            onClick={handleManualAdvance} 
-            className={`w-full font-bold py-3 rounded-lg text-lg ${gameEnded ? "bg-red-600 hover:bg-red-700" : "bg-orange-500 hover:bg-orange-600"} text-white`}
-          >
-            {endButtonLabel}
-          </button>
-         </div>
+
+      {/* Fixed Bottom Controls - Always visible */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-50">
+        <div className="w-full max-w-md mx-auto p-3">
+          <div className="grid grid-cols-3 gap-3">
+            <button onClick={handleShare} className="w-full py-3 rounded-lg font-bold text-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center">
+              {shareMessage ? shareMessage : <ShareIcon />}
+            </button>
+            <button
+              onClick={toggleClock}
+              className={`w-full py-3 rounded-lg font-bold text-lg ${game.isRunning ? "bg-yellow-500 text-black" : "bg-green-500 text-white"}`}
+              disabled={gameEnded}
+            >
+              {game.isRunning ? "Pause" : "Start"}
+            </button>
+            <button 
+              onClick={handleManualAdvance} 
+              className={`w-full font-bold py-3 rounded-lg text-lg ${gameEnded ? "bg-red-600 hover:bg-red-700" : "bg-orange-500 hover:bg-orange-600"} text-white`}
+            >
+              {endButtonLabel}
+            </button>
+           </div>
+        </div>
       </div>
     </div>
   );

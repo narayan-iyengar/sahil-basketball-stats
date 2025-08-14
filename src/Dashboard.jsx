@@ -1,6 +1,13 @@
 import React, { useMemo, useState } from "react";
 import StatGraphModal from "./StatGraphModal";
 import { PlusIcon, TrashIcon, ChevronRightIcon } from "./icons";
+import { getEarnedBadges, BadgeSummary, BadgeDisplay } from "./achievement_system";
+import { PhotoUpload, PhotoThumbnails } from "./photo_system";
+
+// Expandable bar icon (same as LiveGameAdmin)
+const ExpandableBar = ({ isExpanded, className = "" }) => (
+  <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
+);
 
 // Card for stat values
 const StatCard = ({ label, value, onClick, clickable }) => (
@@ -45,11 +52,13 @@ function groupGamesByAge(games) {
 export default function Dashboard({
   stats = [],
   onDeleteGame,
+  onUpdateGamePhotos, // New prop for updating photos
 }) {
   const [newTeamName, setNewTeamName] = useState("");
   const [graphData, setGraphData] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [outcomeFilter, setOutcomeFilter] = useState(""); // New: W/L/T filter
   const [expandedGameIds, setExpandedGameIds] = useState([]);
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -119,13 +128,16 @@ export default function Dashboard({
     if (dateFilter) {
       sortableItems = sortableItems.filter((game) => game.date === dateFilter);
     }
+    if (outcomeFilter) {
+      sortableItems = sortableItems.filter((game) => game.outcome === outcomeFilter);
+    }
     sortableItems.sort((a, b) => {
       if (a.timestamp < b.timestamp) return 1;
       if (a.timestamp > b.timestamp) return -1;
       return 0;
     });
     return sortableItems;
-  }, [stats, searchTerm, dateFilter]);
+  }, [stats, searchTerm, dateFilter, outcomeFilter]);
 
   const paginatedStats = useMemo(() => {
     const startIndex = (currentPage - 1) * GAMES_PER_PAGE;
@@ -208,6 +220,21 @@ export default function Dashboard({
   const handleOpponentSuggestionClick = (opp) => {
     setSearchTerm(opp);
     setShowOpponentSuggestions(false);
+  };
+
+  // Format timestamp properly
+  const formatGameTimestamp = (timestamp) => {
+    if (!timestamp) return "No date";
+    const date = new Date(timestamp);
+    return date.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit", 
+      year: "numeric"
+    }) + " " + date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    });
   };
 
   return (
@@ -302,56 +329,80 @@ export default function Dashboard({
         {/* Game History */}
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
           <div
-            className="flex justify-between items-center mb-4 cursor-pointer"
+            className="flex flex-col items-center mb-4 cursor-pointer p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             onClick={() => setIsHistoryVisible(!isHistoryVisible)}
           >
-            <h2 className="text-2xl font-bold text-orange-500">
+            <ExpandableBar isExpanded={isHistoryVisible} />
+            <h2 className="text-2xl font-bold text-orange-500 mt-2">
               Game History
             </h2>
-            <ChevronRightIcon
-              className={`${isHistoryVisible ? "rotate-90" : ""} text-black dark:text-white`}
-            />
           </div>
           {isHistoryVisible && (
             <>
               <div className="flex flex-col sm:flex-row gap-4 mb-4 relative">
-                <div className="relative w-full sm:w-1/2">
-                  <input
-                    type="text"
-                    placeholder="Search by opponent..."
+                <div className="relative w-full sm:w-1/3">
+                  <select
                     value={searchTerm}
-                    onChange={handleSearchChange}
-                    onFocus={() => setShowOpponentSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowOpponentSuggestions(false), 150)}
-                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-                  />
-                  {showOpponentSuggestions && filteredOpponentSuggestions.length > 0 && (
-                    <ul className="absolute left-0 z-10 mt-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded shadow-lg w-full max-h-44 overflow-y-auto">
-                      {filteredOpponentSuggestions.map((opp) => (
-                        <li
-                          key={opp}
-                          className="p-2 hover:bg-orange-100 dark:hover:bg-orange-900 cursor-pointer text-black dark:text-white"
-                          onMouseDown={() => handleOpponentSuggestionClick(opp)}
-                        >
-                          {opp}
-                        </li>
-                      ))}
-                    </ul>
+                    onChange={(e) => {
+                      if (e.target.value === "__ADD_NEW__") {
+                        setSearchTerm("");
+                        setShowOpponentSuggestions(true);
+                      } else {
+                        setSearchTerm(e.target.value);
+                        setShowOpponentSuggestions(false);
+                      }
+                    }}
+                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full appearance-none"
+                  >
+                    <option value="">All opponents</option>
+                    {allOpponents.map((opp, index) => (
+                      <option key={index} value={opp}>
+                        {opp}
+                      </option>
+                    ))}
+                    <option value="__ADD_NEW__" className="font-bold border-t border-gray-300">
+                      🔍 Search by typing...
+                    </option>
+                  </select>
+                  {/* Custom search input overlay */}
+                  {searchTerm === "" && showOpponentSuggestions && (
+                    <input
+                      type="text"
+                      placeholder="Type to search opponents..."
+                      value={searchTerm}
+                      onChange={handleSearchChange}
+                      onBlur={() => setTimeout(() => setShowOpponentSuggestions(false), 150)}
+                      className="absolute inset-0 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
+                      autoFocus
+                    />
                   )}
                 </div>
-                <div className="relative w-full sm:w-1/2">
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-                />
-              </div>
+                <div className="relative w-full sm:w-1/3">
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
+                  />
+                </div>
+                <div className="relative w-full sm:w-1/3">
+                  <select
+                    value={outcomeFilter}
+                    onChange={(e) => setOutcomeFilter(e.target.value)}
+                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
+                  >
+                    <option value="">All Games</option>
+                    <option value="W">Wins</option>
+                    <option value="L">Losses</option>
+                    <option value="T">Ties</option>
+                  </select>
+                </div>
               </div>
               <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-2">
                 {paginatedStats.length > 0 ? (
                   paginatedStats.map((game) => {
                     const expanded = expandedGameIds.includes(game.id);
+                    const earnedBadges = getEarnedBadges(game);
                     return (
                       <div
                         key={game.id}
@@ -371,14 +422,21 @@ export default function Dashboard({
                             />
                             <div>
                               <p className="font-bold text-lg text-gray-900 dark:text-white">
-                                {new Date(game.timestamp).toLocaleString()}
+                                {formatGameTimestamp(game.timestamp)}
                               </p>
                               <p className="font-bold text-lg text-orange-500">
                                 {game.teamName} vs {game.opponent}
                               </p>
-			      <p className="italic text-xs mt-1 text-gray-700 dark:text-gray-200">
-                              {game.adminName ? `${game.adminName}` : ""}
+                              {game.location && (
+                                <p className="text-sm text-gray-600 dark:text-gray-400 italic">
+                                  📍 {game.location}
+                                </p>
+                              )}
+                              <p className="italic text-xs mt-1 text-gray-700 dark:text-gray-200">
+                                {game.adminName ? `Scored by ${game.adminName}` : ""}
                               </p>
+                              <BadgeSummary badges={earnedBadges} />
+                              <PhotoThumbnails photos={game.photos} />
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -460,6 +518,12 @@ export default function Dashboard({
                                 )}
                               />
                             </div>
+                            <BadgeDisplay badges={earnedBadges} />
+                            <PhotoUpload 
+                              gameId={game.id} 
+                              photos={game.photos || []} 
+                              onPhotosUpdate={onUpdateGamePhotos || (() => console.error("onUpdateGamePhotos not provided"))}
+                            />
                           </div>
                         )}
                       </div>
@@ -543,12 +607,6 @@ export default function Dashboard({
             </p>
             <div className="flex gap-4 justify-end">
               <button
-                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700"
-                onClick={() => setDeletingTeamId(null)}
-              >
-                Cancel
-              </button>
-              <button
                 className="px-4 py-2 rounded bg-red-500 text-white font-bold"
                 onClick={confirmDeleteTeam}
               >
@@ -561,4 +619,3 @@ export default function Dashboard({
     </>
   );
 }
-

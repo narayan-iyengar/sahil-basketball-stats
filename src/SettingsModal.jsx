@@ -24,19 +24,6 @@ export default function SettingsModal({
   const [newTeam, setNewTeam] = useState("");
   const [saveStatus, setSaveStatus] = useState(""); // "saving", "success", "error"
 
-  // Load settings from localStorage on mount
-  useEffect(() => {
-    const savedFormat = localStorage.getItem("gameFormat");
-    const savedLength = localStorage.getItem("periodLength");
-    
-    if (savedFormat && savedFormat !== gameFormat) {
-      setGameFormat(savedFormat);
-    }
-    if (savedLength && parseInt(savedLength) !== periodLength) {
-      setPeriodLength(parseInt(savedLength));
-    }
-  }, []);
-
   // De-dupe teams by id (should not be needed if parent does it right)
   const uniqueTeams = Array.from(
     new Map(teams.map((t) => [t.id, t])).values()
@@ -92,14 +79,11 @@ export default function SettingsModal({
     setTimeout(() => setSaveStatus(""), 1200);
   };
 
-  // Theme switcher with close
+  // Theme switcher - don't close modal, just toggle theme
   const handleThemeToggle = () => {
     toggleTheme();
     setSaveStatus("success");
-    setTimeout(() => {
-      setSaveStatus("");
-      onClose();
-    }, 200);
+    setTimeout(() => setSaveStatus(""), 1200);
   };
 
   // Delete live games (closes modal)
