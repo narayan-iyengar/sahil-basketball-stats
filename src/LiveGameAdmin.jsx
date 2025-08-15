@@ -93,10 +93,10 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
       
       displayInterval.current = setInterval(() => {
         const now = Date.now();
-        const elapsedMs = now - game.clockStartTime;
+        const elapsedMs = now - data.clockStartTime;
         const elapsedSeconds = Math.floor(elapsedMs / 1000);
-        const currentClock = Math.max(0, game.clockAtStart - elapsedSeconds);
-        const tenths = Math.max(0, (game.clockAtStart * 1000) - elapsedMs) / 100;
+        const currentClock = Math.max(0, data.clockAtStart - elapsedSeconds);
+        const tenths = Math.max(0, (data.clockAtStart * 1000) - elapsedMs) / 100;
         
         setDisplayClock(currentClock);
         setDisplayClockTenths(tenths);
@@ -274,6 +274,8 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
     }         
   };
 
+
+
   // --- Share logic
   const handleShare = () => {
     const shareableLink = `${window.location.origin}${window.location.pathname}?liveGameId=${gameId}`;
@@ -314,6 +316,12 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
   const clockIsRed = displayClock <= 120 || (atFinalPeriod && displayClock === 0);
   const clockIsUrgent = displayClock <= 60 && displayClock > 0;
 
+
+  //Font Size
+  const maxNameLength = Math.max(
+  game.teamName?.length || 1, 
+  game.opponent?.length || 1
+);
   return (
     <div className="h-screen flex flex-col">
       {/* Game ended notification */}
@@ -328,14 +336,9 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
         <div className="w-full max-w-md mx-auto p-4">
           <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 relative">
             <div className="absolute top-2 right-2"><SaveStatusIndicator status={saveStatus} /></div>
-            <div className="flex justify-around items-center text-center">
-              <div className="w-1/3 flex flex-col items-center relative">
-                <span className="text-lg font-bold truncate text-center">{game.teamName}</span>
-                <div className="flex items-center">
-                  <span className="text-5xl font-mono">{game.homeScore}</span>
-                </div>
-              </div>
-              <div className="w-1/3 flex flex-col items-center justify-center">
+            {/* Clock Section - Centered */}
+            <div className="flex justify-center items-center text-center mb-4">
+              <div className="flex flex-col items-center justify-center">
                 <span className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
                   clockIsUrgent 
                     ? 'text-red-500 animate-pulse scale-110 font-bold' 
@@ -347,54 +350,72 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
                 </span>
                 <span className="text-sm text-gray-500 dark:text-gray-400 capitalize">{periodName} {game.period}</span>
               </div>
-              <div className="w-1/3 flex flex-col items-center relative">
-                <span className="text-lg font-bold truncate text-center">{game.opponent}</span>
-                <div className="flex items-center">
-                  <span className="text-5xl font-mono">{game.awayScore}</span>
+            </div>
+
+            {/* Team Names and Score Steppers - Aligned */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Home Team */}
+              <div className="flex flex-col items-center">
+                <span 
+                  className="font-bold text-center leading-tight break-words hyphens-auto px-1 mb-2"
+                  style={{
+                    fontSize: `${Math.max(18, Math.min(20, 120 / Math.max(maxNameLength, 6)))}px`
+                  }}
+                >
+                  {game.teamName}
+                </span>
+                <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg w-full">
+                  <button 
+                    onClick={() => handleScoreChange("home", -1)} 
+                    className="bg-red-500 hover:bg-red-600 text-white w-9 h-9 rounded-md text-lg font-bold flex items-center justify-center shadow-md disabled:opacity-50 transition-all active:scale-95" 
+                    disabled={game.homeScore <= 0}
+                  >
+                    −
+                  </button>
+                  <span className="font-semibold text-3xl px-2 text-center flex-1 text-gray-900 dark:text-white font-mono">
+                    {game.homeScore}
+                  </span>
+                  <button 
+                    onClick={() => handleScoreChange("home", 1)} 
+                    className="bg-green-500 hover:bg-green-600 text-white w-9 h-9 rounded-md text-lg font-bold flex items-center justify-center shadow-md transition-all active:scale-95"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Away Team */}
+              <div className="flex flex-col items-center">
+                <span 
+                  className="font-bold text-center leading-tight break-words hyphens-auto px-1 mb-2"
+                  style={{
+                    fontSize: `${Math.max(18, Math.min(20, 120 / Math.max(maxNameLength, 6)))}px`
+                  }}
+                >
+                  {game.opponent}
+                </span>
+                <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg w-full">
+                  <button 
+                    onClick={() => handleScoreChange("away", -1)} 
+                    className="bg-red-500 hover:bg-red-600 text-white w-9 h-9 rounded-md text-lg font-bold flex items-center justify-center shadow-md disabled:opacity-50 transition-all active:scale-95" 
+                    disabled={game.awayScore <= 0}
+                  >
+                    −
+                  </button>
+                  <span className="font-semibold text-3xl px-2 text-center flex-1 text-gray-900 dark:text-white font-mono">
+                    {game.awayScore}
+                  </span>
+                  <button 
+                    onClick={() => handleScoreChange("away", 1)} 
+                    className="bg-green-500 hover:bg-green-600 text-white w-9 h-9 rounded-md text-lg font-bold flex items-center justify-center shadow-md transition-all active:scale-95"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             </div>
-           <div className="grid grid-cols-2 gap-3 mt-4">
-  <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">
-    <button 
-      onClick={() => handleScoreChange("home", -1)} 
-      className="bg-red-500 hover:bg-red-600 text-white w-9 h-9 text-lg font-bold flex items-center justify-center shadow-md disabled:opacity-50 transition-all active:scale-95" 
-      disabled={game.homeScore <= 0}
-    >
-      −
-    </button>
-    <span className="font-semibold text-sm px-2 text-center flex-1 text-gray-900 dark:text-white">
-    
-    </span>
-    <button 
-      onClick={() => handleScoreChange("home", 1)} 
-      className="bg-green-500 hover:bg-green-600 text-white w-9 h-9  text-lg font-bold flex items-center justify-center shadow-md transition-all active:scale-95"
-    >
-      +
-    </button>
-  </div>
-  <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">
-    <button 
-      onClick={() => handleScoreChange("away", -1)} 
-      className="bg-red-500 hover:bg-red-600 text-white w-9 h-9  text-lg font-bold flex items-center justify-center shadow-md disabled:opacity-50 transition-all active:scale-95" 
-      disabled={game.awayScore <= 0}
-    >
-      −
-    </button>
-    <span className="font-semibold text-sm px-2 text-center flex-1 text-gray-900 dark:text-white">
-    </span>
-    <button 
-      onClick={() => handleScoreChange("away", 1)} 
-      className="bg-green-500 hover:bg-green-600 text-white w-9 h-9  text-lg font-bold flex items-center justify-center shadow-md transition-all active:scale-95"
-    >
-      +
-    </button>
-  </div>
 </div>
-          </div>
-        </div>
-      </div>
-
+  </div>
       {/* Scrollable Stats Section */}
       <div className="flex-1 overflow-y-auto">
         <div className="w-full max-w-md mx-auto p-4">
@@ -459,6 +480,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
            </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
