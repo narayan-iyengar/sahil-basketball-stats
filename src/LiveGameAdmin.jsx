@@ -364,7 +364,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
       −
     </button>
     <span className="font-semibold text-sm px-2 text-center flex-1 text-gray-900 dark:text-white">
-      {game.teamName}
+    
     </span>
     <button 
       onClick={() => handleScoreChange("home", 1)} 
@@ -382,7 +382,6 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
       −
     </button>
     <span className="font-semibold text-sm px-2 text-center flex-1 text-gray-900 dark:text-white">
-      {game.opponent}
     </span>
     <button 
       onClick={() => handleScoreChange("away", 1)} 
@@ -421,7 +420,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
                   <StatStepperGroup label="3-Pointers" madeValue={playerStats.fg3m} attValue={playerStats.fg3a} onStatChange={handleStatChange} madeKey="fg3m" attKey="fg3a" />
                   <StatStepperGroup label="Free Throws" madeValue={playerStats.ftm} attValue={playerStats.fta} onStatChange={handleStatChange} madeKey="ftm" attKey="fta" />
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 justify-items-center">
+                <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
                   <StatStepper label="Rebounds" value={playerStats.rebounds} onIncrement={() => handleStatChange("rebounds", 1)} onDecrement={() => handleStatChange("rebounds", -1)} />
                   <StatStepper label="Assists" value={playerStats.assists} onIncrement={() => handleStatChange("assists", 1)} onDecrement={() => handleStatChange("assists", -1)} />
                   <StatStepper label="Steals" value={playerStats.steals} onIncrement={() => handleStatChange("steals", 1)} onDecrement={() => handleStatChange("steals", -1)} />

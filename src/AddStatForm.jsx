@@ -195,52 +195,6 @@ export default function AddStatForm({ gameConfig, onAddStat, onCancel, isEditing
           </div>
         </div>
 
-        {/* Location */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4 text-center">Game Location</h3>
-          <div className="max-w-md mx-auto space-y-2">
-            <div className="flex gap-2">
-              <select
-                name="location"
-                value={formData.location && uniqueLocations.includes(formData.location) ? formData.location : ""}
-                onChange={(e) => {
-                  if (e.target.value === "__ADD_NEW__") {
-                    setFormData((prev) => ({ ...prev, location: "" }));
-                  } else {
-                    setFormData((prev) => ({ ...prev, location: e.target.value }));
-                  }
-                }}
-                className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none flex-1"
-              >
-                <option value="">Select location...</option>
-                {uniqueLocations.map((location, index) => (
-                  <option key={index} value={location}>
-                    {location}
-                  </option>
-                ))}
-                <option value="__ADD_NEW__" className="font-bold border-t border-gray-300">
-                  + Add New Location
-                </option>
-              </select>
-              <button
-                type="button"
-                onClick={getAutoLocation}
-                disabled={isGettingLocation}
-                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded font-medium text-sm whitespace-nowrap"
-              >
-                {isGettingLocation ? "Getting..." : "Auto"}
-              </button>
-            </div>
-            <input
-              type="text"
-              name="location"
-              placeholder="Or type new location..."
-              value={formData.location}
-              onChange={handleTextInputChange}
-              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-            />
-          </div>
-        </div>
 
         {/* Shooting */}
         <div>
