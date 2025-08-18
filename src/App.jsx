@@ -14,6 +14,7 @@ import StatEntry from "./StatEntry"; // Import the unified stat entry component
 import { listenPresence, setPresence, removePresence } from "./presence";
 import SettingsModal from "./SettingsModal";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
+import { ref, onDisconnect, set, serverTimestamp } from 'firebase/database'; // Add these imports
 
 export default function App() {
   // Auth & User
@@ -51,18 +52,18 @@ export default function App() {
 
 
   // --- AUTH LOGIC ---
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-      if (!u) {
-        removePresence(user, "viewer", liveGameId);
-        removePresence(user, "admin", liveGameId);
-      }
-    });
-    return unsub;
-    // eslint-disable-next-line
-  }, []);
+ // useEffect(() => {
+ //   const unsub = onAuthStateChanged(auth, (u) => {
+ //     setUser(u);
+ //     setLoading(false);
+ //     if (!u) {
+ //       removePresence(user, "viewer", liveGameId);
+ //       removePresence(user, "admin", liveGameId);
+ //     }
+ //   });
+ //   return unsub;
+ //   // eslint-disable-next-line
+ // }, []);
 
   // --- THEME LOGIC ---
   useEffect(() => {
@@ -99,21 +100,54 @@ export default function App() {
   }, [user]);
 
   // --- PRESENCE LOGIC ---
+ // useEffect(() => {
+ //   if (!user) return;
+ //   setPresence(user, "admin");
+ //   const unsub = listenPresence("admin", null, (arr) => setAdmins(arr || []));
+ //   return () => {
+ //     removePresence(user, "admin");
+ //     if (unsub && typeof unsub === "function") unsub();
+ //   };
+ // }, [user]);
+ // useEffect(() => {
+ //   const unsub = listenPresence("viewer", null, (arr) => setViewers(arr || []));
+ //   return () => {
+ //     if (unsub && typeof unsub === "function") unsub();
+ //   };
+ // }, []);
+
+  // --- CONSOLIDATED AUTH & PRESENCE LOGIC ---
   useEffect(() => {
-    if (!user) return;
-    setPresence(user, "admin");
-    const unsub = listenPresence("admin", null, (arr) => setAdmins(arr || []));
-    return () => {
-      removePresence(user, "admin");
-      if (unsub && typeof unsub === "function") unsub();
-    };
-  }, [user]);
-  useEffect(() => {
-    const unsub = listenPresence("viewer", null, (arr) => setViewers(arr || []));
-    return () => {
-      if (unsub && typeof unsub === "function") unsub();
-    };
-  }, []);
+    // This listener is the single source of truth for auth state
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setLoading(false);
+      setUser(user); // Continue to set your React state
+
+      if (user) {
+        // User is signed IN. It's now safe to set their presence.
+        const presenceRef = ref(rtdb, `presence/admins/${user.uid}`);
+        
+        // Use onDisconnect() for reliable, server-side cleanup.
+        // This automatically removes the user's presence when they disconnect.
+        onDisconnect(presenceRef).remove();
+
+        // Now, set the presence data. This will succeed.
+        set(presenceRef, {
+          uid: user.uid,
+          name: user.displayName || "Admin",
+          ts: serverTimestamp(),
+        });
+
+      }
+      // Note: No 'else' block is needed to remove presence,
+      // because onDisconnect() handles it automatically.
+    });
+
+    // Cleanup the listener when the app unmounts
+    return () => unsub();
+  }, []); // The empty dependency array [] ensures this runs only once.
+
+  
 
   // --- LIVE GAME ID TRACKER ---
   useEffect(() => {
