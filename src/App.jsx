@@ -37,13 +37,6 @@ export default function App() {
   // Settings Modal
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // NEW: Dashboard filters state
-  const [dashboardFilters, setDashboardFilters] = useState({
-    searchTerm: '',
-    dateFilter: '',
-    outcomeFilter: ''
-  });
-
   // Game setup global settings
   const [globalGameFormat, setGlobalGameFormat] = useState(() => {
     return localStorage.getItem("gameFormat") || "halves";
@@ -56,6 +49,7 @@ export default function App() {
   // Presence State
   const [admins, setAdmins] = useState([]);
   const [viewers, setViewers] = useState([]);
+
 
   // --- AUTH LOGIC ---
  // useEffect(() => {
@@ -372,6 +366,9 @@ try {
     }
   };
 
+
+
+
   // --- PAGE RENDER LOGIC ---
   if (loading || liveGameLoading) {
     return (
@@ -465,10 +462,6 @@ if (!user && page === "live_viewer") {
         goToLiveGame={() => setPage("live_viewer")}
         onDeleteAllLiveGames={handleDeleteAllLiveGames}
         openSettingsModal={() => setSettingsOpen(true)}
-        // NEW: Pass filter props to Header
-        games={games}
-        dashboardFilters={dashboardFilters}
-        onDashboardFiltersChange={setDashboardFilters}
       />
       <SettingsModal
         open={settingsOpen}
@@ -511,9 +504,7 @@ if (!user && page === "live_viewer") {
             onDeleteGame={handleDeleteGame}
             onDeleteTeam={handleDeleteTeam}
             onAddTeam={handleAddTeam}
-            onUpdateGamePhotos={handleUpdateGamePhotos}
-            // NEW: Pass external filters
-            externalFilters={dashboardFilters}
+            onUpdateGamePhotos={handleUpdateGamePhotos} 
           />
         )}
         {user && page === "add_stat" && currentGameConfig && (
