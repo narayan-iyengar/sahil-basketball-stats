@@ -4,8 +4,8 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
   const [config, setConfig] = useState({
     teamName: "",
     opponent: "",
-    gameFormat: "periods",
-    periodLength: 10,
+    gameFormat: localStorage.getItem("gameFormat") || "periods",
+    periodLength: parseInt(localStorage.getItem("periodLength")) || 10,
     numPeriods: 4,
     date: new Date().toISOString().split("T")[0],
     time: new Date().toLocaleTimeString([], {
@@ -78,9 +78,40 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
 
   return (
     <div className="max-w-xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-      <h2 className="text-3xl font-bold text-orange-500 mb-6 text-center">
-        Set Up New Game
-      </h2>
+      {/* Header with centered date/time */}
+      <div className="flex items-center justify-center mb-6">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-1 border border-gray-300 dark:border-gray-600">
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <input
+              type="date"
+              name="date"
+              value={config.date}
+              onChange={handleChange}
+              className="bg-transparent text-gray-900 dark:text-white text-sm outline-none appearance-none w-24"
+            />
+          </div>
+          <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-1 border border-gray-300 dark:border-gray-600">
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12,6 12,12 16,14"/>
+            </svg>
+            <input
+              type="time"
+              name="time"
+              value={config.time}
+              onChange={handleChange}
+              className="bg-transparent text-gray-900 dark:text-white text-sm outline-none appearance-none w-24"
+            />
+          </div>
+        </div>
+      </div>
+
       {error && (
         <p className="text-red-500 bg-red-100 dark:bg-red-900/50 p-3 rounded-md mb-4 text-center">
           {error}
@@ -95,7 +126,7 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
             name="teamName"
             value={config.teamName}
             onChange={handleChange}
-            className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
+            className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full appearance-none"
           >
             <option value="" disabled>
               Select Team
@@ -161,32 +192,6 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Game Date
-            </label>
-            <input
-              type="date"
-              name="date"
-              value={config.date}
-              onChange={handleChange}
-              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Game Time
-            </label>
-            <input
-              type="time"
-              name="time"
-              value={config.time}
-              onChange={handleChange}
-              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-            />
-          </div>
-        </div>
         <div className="border-t border-gray-200 dark:border-gray-600 pt-6 space-y-4">
           <button
             onClick={() => handleSubmit("live")}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { BasketballIcon, LogOutIcon, ChartIcon, SunIcon, MoonIcon, EyeIcon, UserIcon, SlidersIcon } from "./icons";
+import { BasketballIcon, LogOutIcon, ChartIcon, SunIcon, MoonIcon, EyeIcon, UserIcon, SlidersIcon, FilterIcon } from "./icons";
+import FilterDropdown from "./FilterDropdown";
 
 // Blinking dot for Live indicator
 const BlinkingDot = ({ active }) => (
@@ -28,7 +29,12 @@ export default function Header({
   goToLiveGame,
   openSettingsModal,
   onSignIn,   // NEW: optional, for anonymous view
+  // NEW PROPS FOR FILTERING
+  games = [],
+  dashboardFilters = {},
+  onDashboardFiltersChange,
 }) {
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const hasLive = !!liveGameId;
 
   // Live indicator: dot on mobile, dot+Live label on desktop
@@ -77,69 +83,126 @@ export default function Header({
       <span className="text-xs text-gray-400">No one online</span>
     );
 
+  // Check if any filters are active
+  const hasActiveFilters = dashboardFilters.searchTerm || dashboardFilters.dateFilter || dashboardFilters.outcomeFilter;
+
+  // Handle filter changes
+  const handleFiltersChange = (newFilters) => {
+    if (onDashboardFiltersChange) {
+      onDashboardFiltersChange(newFilters);
+    }
+  };
+
   return (
     <header className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm sticky top-0 z-20 border-b border-gray-200 dark:border-gray-700">
-      <div className="max-w-6xl mx-auto grid grid-cols-3 items-center px-2 sm:px-4 py-2 sm:py-4 gap-4">
-        {/* Left: Logo */}
-        <div
-          className="flex items-center cursor-pointer justify-start"
-          onClick={() => setPage("game_setup")}
-        >
-          <BasketballIcon className="h-7 w-7 sm:h-8 sm:w-8 text-orange-500 animate-spin-slow hover:scale-110 transition-transform" />
-        </div>
-
-        {/* Center: Live Button */}
-        <div className="flex justify-center">
-          {LiveIndicator}
-        </div>
-
-        {/* Right: Controls with Presence Indicators */}
-        <div className="flex items-center gap-1 sm:gap-2 justify-end">
-          <button
-            onClick={openSettingsModal}
-            className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all border-2 ${
-              admins.length === 0 
-                ? 'border-transparent' 
-                : admins.length === 1
-                ? 'border-blue-300 shadow-sm shadow-blue-300/30'
-                : admins.length === 2
-                ? 'border-blue-400 shadow-md shadow-blue-400/40'
-                : 'border-blue-500 shadow-lg shadow-blue-500/50'
-            }`}
-          >
-            <SlidersIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-          </button>
-          <button
-            onClick={() => setPage("dashboard")}
-            className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all border-2 ${
-              viewers.length === 0 
-                ? 'border-transparent' 
-                : viewers.length === 1
-                ? 'border-green-300 shadow-sm shadow-green-300/30'
-                : viewers.length <= 3
-                ? 'border-green-400 shadow-md shadow-green-400/40'
-                : 'border-green-500 shadow-lg shadow-green-500/50'
-            }`}
-          >
-            <ChartIcon className="h-5 w-5" />
-          </button>
-          {user ? (
-            <button
-              onClick={onSignOut}
-              className="bg-red-500 hover:bg-red-600 text-white rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all"
+      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
+        <div className="flex items-center justify-between">
+          {/* Left: Logo and Live Button */}
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center cursor-pointer"
+              onClick={() => setPage("game_setup")}
             >
-              <LogOutIcon className="h-5 w-5" />
+              <BasketballIcon className="h-7 w-7 sm:h-8 sm:w-8 text-orange-500 animate-spin-slow hover:scale-110 transition-transform" />
+            </div>
+            {LiveIndicator}
+          </div>
+
+          {/* Right: Controls - Settings, Dashboard, Filter, Sign Out */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Settings Button - Always visible */}
+            <button
+              onClick={openSettingsModal}
+              className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all border-2 ${
+                admins.length === 0 
+                  ? 'border-transparent' 
+                  : admins.length === 1
+                  ? 'border-blue-300 shadow-sm shadow-blue-300/30'
+                  : admins.length === 2
+                  ? 'border-blue-400 shadow-md shadow-blue-400/40'
+                  : 'border-blue-500 shadow-lg shadow-blue-500/50'
+              }`}
+              title="Settings"
+            >
+              <SlidersIcon className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
-          ) : (
-            onSignIn && (
+
+            {/* Dashboard Button - Always visible */}
+            <button
+              onClick={() => setPage("dashboard")}
+              className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all border-2 ${
+                viewers.length === 0 
+                  ? 'border-transparent' 
+                  : viewers.length === 1
+                  ? 'border-green-300 shadow-sm shadow-green-300/30'
+                  : viewers.length <= 3
+                  ? 'border-green-400 shadow-md shadow-green-400/40'
+                  : 'border-green-500 shadow-lg shadow-green-500/50'
+              }`}
+              title="Dashboard"
+            >
+              <ChartIcon className="h-5 w-5" />
+            </button>
+
+            {/* Filter Button - Always visible, functional only on Dashboard */}
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    if (page === "dashboard") {
+                      setShowFilterDropdown(!showFilterDropdown);
+                    }
+                  }}
+                  className={`flex items-center justify-center rounded-lg p-2 transition-all border-2 ${
+                    page === "dashboard"
+                      ? `bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 cursor-pointer ${
+                          hasActiveFilters 
+                            ? 'border-orange-300 shadow-sm shadow-orange-300/30' 
+                            : 'border-transparent'
+                        }`
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed border-transparent'
+                  }`}
+                  title={page === "dashboard" ? "Filter games" : "Filter only available on Dashboard"}
+                  disabled={page !== "dashboard"}
+                >
+                  <FilterIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                  {hasActiveFilters && page === "dashboard" && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full"></span>
+                  )}
+                </button>
+                
+                {showFilterDropdown && page === "dashboard" && (
+                  <FilterDropdown 
+                    games={games}
+                    filters={dashboardFilters}
+                    onFiltersChange={handleFiltersChange}
+                    onClose={() => setShowFilterDropdown(false)}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Sign Out/Sign In Button */}
+            {user ? (
               <button
-                onClick={onSignIn}
-                className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all"
+                onClick={onSignOut}
+                className="bg-red-500 hover:bg-red-600 text-white rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all"
+                title="Sign Out"
               >
-                <UserIcon className="h-5 w-5" />
+                <LogOutIcon className="h-5 w-5" />
               </button>
-            )
-          )}
+            ) : (
+              onSignIn && (
+                <button
+                  onClick={onSignIn}
+                  className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all"
+                  title="Sign In"
+                >
+                  <UserIcon className="h-5 w-5" />
+                </button>
+              )
+            )}
+          </div>
         </div>
       </div>
     </header>

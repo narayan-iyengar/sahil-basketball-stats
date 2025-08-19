@@ -1,8 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import StatGraphModal from "./StatGraphModal";
 import { PlusIcon, TrashIcon, ChevronRightIcon } from "./icons";
 import { getEarnedBadges, BadgeSummary, BadgeDisplay } from "./achievement_system";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
+
+// Subtle checkmark icon
+const CheckIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
 
 // Expandable bar icon (same as LiveGameAdmin)
 const ExpandableBar = ({ isExpanded, className = "" }) => (
@@ -52,20 +59,38 @@ function groupGamesByAge(games) {
 export default function Dashboard({
   stats = [],
   onDeleteGame,
-  onUpdateGamePhotos, // New prop for updating photos
+  onUpdateGamePhotos, 
+  externalFilters = {}, // NEW: Filters from header
 }) {
   const [newTeamName, setNewTeamName] = useState("");
   const [graphData, setGraphData] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
-  const [outcomeFilter, setOutcomeFilter] = useState(""); // New: W/L/T filter
+  
+  // NEW: Use external filters if provided, otherwise use local state
+  const [searchTerm, setSearchTerm] = useState(externalFilters.searchTerm || "");
+  const [dateFilter, setDateFilter] = useState(externalFilters.dateFilter || "");
+  const [outcomeFilter, setOutcomeFilter] = useState(externalFilters.outcomeFilter || ""); 
+  
   const [expandedGameIds, setExpandedGameIds] = useState([]);
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingGameId, setDeletingGameId] = useState(null);
   const [deletingTeamId, setDeletingTeamId] = useState(null);
   const [showOpponentSuggestions, setShowOpponentSuggestions] = useState(false);
+  
+  // NEW: Multi-select state
+  const [selectedGameIds, setSelectedGameIds] = useState([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  
   const GAMES_PER_PAGE = 4;
+
+  // NEW: Update local filters when external filters change
+  useEffect(() => {
+    setSearchTerm(externalFilters.searchTerm || "");
+    setDateFilter(externalFilters.dateFilter || "");
+    setOutcomeFilter(externalFilters.outcomeFilter || "");
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [externalFilters]);
 
   // Unique opponent suggestions
   const allOpponents = useMemo(() => {
@@ -177,6 +202,42 @@ export default function Dashboard({
     }
   };
 
+  // Multi-select handlers
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedGameIds([]);
+  };
+
+  const toggleGameSelection = (gameId) => {
+    setSelectedGameIds(prev => 
+      prev.includes(gameId) 
+        ? prev.filter(id => id !== gameId)
+        : [...prev, gameId]
+    );
+  };
+
+  const selectAllGames = () => {
+    const currentPageGameIds = paginatedStats.map(game => game.id);
+    setSelectedGameIds(currentPageGameIds);
+  };
+
+  const deselectAllGames = () => {
+    setSelectedGameIds([]);
+  };
+
+  const handleBulkDelete = () => {
+    setShowBulkDeleteConfirm(true);
+  };
+
+  const confirmBulkDelete = () => {
+    selectedGameIds.forEach(gameId => {
+      onDeleteGame(gameId);
+    });
+    setSelectedGameIds([]);
+    setIsSelectionMode(false);
+    setShowBulkDeleteConfirm(false);
+  };
+
   // Deleting logic
   const handleDeleteClick = (gameId) => setDeletingGameId(gameId);
   const confirmDeleteGame = () => {
@@ -193,6 +254,7 @@ export default function Dashboard({
     }
   };
   const toggleExpandGame = (gameId) => {
+    if (isSelectionMode) return; // Don't expand in selection mode
     setExpandedGameIds((prev) =>
       prev.includes(gameId)
         ? prev.filter((id) => id !== gameId)
@@ -339,87 +401,114 @@ export default function Dashboard({
           </div>
           {isHistoryVisible && (
             <>
-              <div className="flex flex-col sm:flex-row gap-4 mb-4 relative">
-                <div className="relative w-full sm:w-1/3">
-                  <select
-                    value={searchTerm}
-                    onChange={(e) => {
-                      if (e.target.value === "__ADD_NEW__") {
-                        setSearchTerm("");
-                        setShowOpponentSuggestions(true);
-                      } else {
-                        setSearchTerm(e.target.value);
-                        setShowOpponentSuggestions(false);
-                      }
-                    }}
-                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full appearance-none"
+              {/* Show filter status when filters come from header */}
+              {(externalFilters.searchTerm || externalFilters.dateFilter || externalFilters.outcomeFilter) && (
+                <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <div className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-1">
+                    Active Filters:
+                  </div>
+                  <div className="text-xs text-orange-700 dark:text-orange-300">
+                    {externalFilters.searchTerm && <span className="block">• Opponent: {externalFilters.searchTerm}</span>}
+                    {externalFilters.dateFilter && <span className="block">• Date: {new Date(externalFilters.dateFilter).toLocaleDateString()}</span>}
+                    {externalFilters.outcomeFilter && <span className="block">• Result: {externalFilters.outcomeFilter === 'W' ? 'Wins' : externalFilters.outcomeFilter === 'L' ? 'Losses' : 'Ties'}</span>}
+                  </div>
+                  <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                    Use the filter button in the header to modify filters
+                  </div>
+                </div>
+              )}
+
+              {/* Multi-select controls */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={toggleSelectionMode}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                      isSelectionMode 
+                        ? 'bg-orange-500 text-white' 
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
                   >
-                    <option value="">All opponents</option>
-                    {allOpponents.map((opp, index) => (
-                      <option key={index} value={opp}>
-                        {opp}
-                      </option>
-                    ))}
-                    <option value="__ADD_NEW__" className="font-bold border-t border-gray-300">
-                      🔍 Search by typing...
-                    </option>
-                  </select>
-                  {/* Custom search input overlay */}
-                  {searchTerm === "" && showOpponentSuggestions && (
-                    <input
-                      type="text"
-                      placeholder="Type to search opponents..."
-                      value={searchTerm}
-                      onChange={handleSearchChange}
-                      onBlur={() => setTimeout(() => setShowOpponentSuggestions(false), 150)}
-                      className="absolute inset-0 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-                      autoFocus
-                    />
+                    {isSelectionMode ? 'Cancel' : 'Select'}
+                  </button>
+                  
+                  {isSelectionMode && (
+                    <>
+                      <button
+                        onClick={selectAllGames}
+                        className="px-2 py-1 rounded text-xs bg-blue-500 text-white hover:bg-blue-600"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={deselectAllGames}
+                        className="px-2 py-1 rounded text-xs bg-gray-500 text-white hover:bg-gray-600"
+                      >
+                        Clear
+                      </button>
+                    </>
                   )}
                 </div>
-                <div className="relative w-full sm:w-1/3">
-                  <input
-                    type="date"
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-                  />
-                </div>
-                <div className="relative w-full sm:w-1/3">
-                  <select
-                    value={outcomeFilter}
-                    onChange={(e) => setOutcomeFilter(e.target.value)}
-                    className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-                  >
-                    <option value="">All Games</option>
-                    <option value="W">Wins</option>
-                    <option value="L">Losses</option>
-                    <option value="T">Ties</option>
-                  </select>
-                </div>
+                
+                {isSelectionMode && selectedGameIds.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {selectedGameIds.length} selected
+                    </span>
+                    <button
+                      onClick={handleBulkDelete}
+                      className="px-3 py-1 rounded text-sm bg-red-500 text-white hover:bg-red-600 flex items-center gap-1"
+                    >
+                      <TrashIcon />
+                      Delete Selected
+                    </button>
+                  </div>
+                )}
               </div>
+              
               <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-2">
                 {paginatedStats.length > 0 ? (
                   paginatedStats.map((game) => {
                     const expanded = expandedGameIds.includes(game.id);
+                    const isSelected = selectedGameIds.includes(game.id);
                     const earnedBadges = getEarnedBadges(game);
                     return (
                       <div
                         key={game.id}
                         className="bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
                       >
-                        {/* Header row with chevron in line with team/opponent */}
+                        {/* Header row with optional checkbox */}
                         <div
                           className="p-4 flex items-center justify-between cursor-pointer"
-                          onClick={() => toggleExpandGame(game.id)}
+                          onClick={() => isSelectionMode ? toggleGameSelection(game.id) : toggleExpandGame(game.id)}
                         >
                           <div className="flex items-center gap-2">
-                            <ChevronRightIcon
-                              className={`transition-transform duration-200 text-black dark:text-white ${
-                                expanded ? "rotate-90" : ""
-                              }`}
-                              style={{ minWidth: 20 }}
-                            />
+                            {/* Selection checkbox - subtle design */}
+                            {isSelectionMode && (
+                              <div
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center mr-2 transition-colors ${
+                                  isSelected 
+                                    ? 'bg-orange-500 border-orange-500' 
+                                    : 'border-gray-300 dark:border-gray-600 hover:border-orange-400'
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleGameSelection(game.id);
+                                }}
+                              >
+                                {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
+                              </div>
+                            )}
+                            
+                            {!isSelectionMode && (
+                              <ChevronRightIcon
+                                className={`transition-transform duration-200 text-black dark:text-white ${
+                                  expanded ? "rotate-90" : ""
+                                }`}
+                                style={{ minWidth: 20 }}
+                              />
+                            )}
+                            
                             <div>
                               <p className="font-bold text-lg text-gray-900 dark:text-white">
                                 {formatGameTimestamp(game.timestamp)}
@@ -452,21 +541,23 @@ export default function Dashboard({
                             >
                               {game.outcome || "T"} {showZero(game.myTeamScore)}-{showZero(game.opponentScore)}
                             </span>
-                            {/* Trash icon always shown in header */}
-                            <button
-                              className="p-1 text-red-300 hover:text-red-500 rounded transition"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteClick(game.id);
-                              }}
-                              title="Delete Game"
-                            >
-                              <TrashIcon />
-                            </button>
+                            {/* Trash icon - hidden in selection mode */}
+                            {!isSelectionMode && (
+                              <button
+                                className="p-1 text-red-300 hover:text-red-500 rounded transition"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteClick(game.id);
+                                }}
+                                title="Delete Game"
+                              >
+                                <TrashIcon />
+                              </button>
+                            )}
                           </div>
                         </div>
-                        {/* Expanded view */}
-                        {expanded && (
+                        {/* Expanded view - only show when not in selection mode */}
+                        {expanded && !isSelectionMode && (
                           <div className="p-4 pt-2 relative">
                             {/* Stat grid using the same card style as Career Stats */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
@@ -563,6 +654,35 @@ export default function Dashboard({
           )}
         </div>
       </div>
+      
+      {/* Bulk Delete confirmation modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm mx-auto">
+            <h3 className="text-lg font-bold mb-4 text-red-500">
+              Delete {selectedGameIds.length} Games?
+            </h3>
+            <p className="mb-6">
+              Are you sure you want to delete {selectedGameIds.length} selected game{selectedGameIds.length !== 1 ? 's' : ''}? This cannot be undone.
+            </p>
+            <div className="flex gap-4 justify-end">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-500 text-white font-bold"
+                onClick={confirmBulkDelete}
+              >
+                Delete {selectedGameIds.length} Game{selectedGameIds.length !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete confirmation modal */}
       {deletingGameId && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
