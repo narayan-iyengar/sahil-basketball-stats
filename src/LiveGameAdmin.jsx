@@ -93,10 +93,10 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
       
       displayInterval.current = setInterval(() => {
         const now = Date.now();
-        const elapsedMs = now - data.clockStartTime;
+        const elapsedMs = now - game.clockStartTime;
         const elapsedSeconds = Math.floor(elapsedMs / 1000);
-        const currentClock = Math.max(0, data.clockAtStart - elapsedSeconds);
-        const tenths = Math.max(0, (data.clockAtStart * 1000) - elapsedMs) / 100;
+        const currentClock = Math.max(0, game.clockAtStart - elapsedSeconds);
+        const tenths = Math.max(0, (game.clockAtStart * 1000) - elapsedMs) / 100;
         
         setDisplayClock(currentClock);
         setDisplayClockTenths(tenths);
