@@ -4,6 +4,9 @@ import { PlusIcon, TrashIcon, ChevronRightIcon } from "./icons";
 import { getEarnedBadges, BadgeSummary, BadgeDisplay } from "./achievement_system";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
 
+// Import admin utilities
+import { canDelete, canWrite, showAccessDenied } from "./components/adminUtils";
+
 // Subtle checkmark icon
 const CheckIcon = ({ className = "" }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -11,7 +14,7 @@ const CheckIcon = ({ className = "" }) => (
   </svg>
 );
 
-// Expandable bar icon (same as LiveGameAdmin)
+// Expandable bar icon
 const ExpandableBar = ({ isExpanded, className = "" }) => (
   <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
 );
@@ -29,7 +32,7 @@ const StatCard = ({ label, value, onClick, clickable }) => (
   </div>
 );
 
-// Group games by *age* (year as of Sahil's birthday, 11/01/2016)
+// Group games by age
 function groupGamesByAge(games) {
   const BIRTH = new Date("2016-11-01");
   const byAge = {};
@@ -41,7 +44,7 @@ function groupGamesByAge(games) {
       gameDate.getMonth() < 10 ||
       (gameDate.getMonth() === 10 && gameDate.getDate() < 1);
     if (isBeforeBirthday) age -= 1;
-    if (age < 8) return; // Only show 8+ per user request
+    if (age < 8) return;
     if (!byAge[age])
       byAge[age] = {
         value: 0,
@@ -57,15 +60,17 @@ function groupGamesByAge(games) {
 }
 
 export default function Dashboard({
+  user,
   stats = [],
   onDeleteGame,
   onUpdateGamePhotos, 
-  externalFilters = {}, // NEW: Filters from header
+  externalFilters = {},
+  isUserAdmin = false, // NEW: Admin status prop
 }) {
   const [newTeamName, setNewTeamName] = useState("");
   const [graphData, setGraphData] = useState(null);
   
-  // NEW: Use external filters if provided, otherwise use local state
+  // Use external filters if provided, otherwise use local state
   const [searchTerm, setSearchTerm] = useState(externalFilters.searchTerm || "");
   const [dateFilter, setDateFilter] = useState(externalFilters.dateFilter || "");
   const [outcomeFilter, setOutcomeFilter] = useState(externalFilters.outcomeFilter || ""); 
@@ -77,19 +82,19 @@ export default function Dashboard({
   const [deletingTeamId, setDeletingTeamId] = useState(null);
   const [showOpponentSuggestions, setShowOpponentSuggestions] = useState(false);
   
-  // NEW: Multi-select state
+  // Multi-select state
   const [selectedGameIds, setSelectedGameIds] = useState([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   
   const GAMES_PER_PAGE = 4;
 
-  // NEW: Update local filters when external filters change
+  // Update local filters when external filters change
   useEffect(() => {
     setSearchTerm(externalFilters.searchTerm || "");
     setDateFilter(externalFilters.dateFilter || "");
     setOutcomeFilter(externalFilters.outcomeFilter || "");
-    setCurrentPage(1); // Reset to first page when filters change
+    setCurrentPage(1);
   }, [externalFilters]);
 
   // Unique opponent suggestions
@@ -105,10 +110,10 @@ export default function Dashboard({
     if (!searchTerm) return [];
     return allOpponents
       .filter((opp) => opp.toLowerCase().includes(searchTerm.toLowerCase()))
-      .slice(0, 7); // Limit to top 7
+      .slice(0, 7);
   }, [allOpponents, searchTerm]);
 
-  // Aggregate stats (guard for stats being undefined)
+  // Aggregate stats
   const aggregatedStats = (stats || []).reduce((acc, game) => {
     acc.points = (acc.points || 0) + (parseInt(game.points, 10) || 0);
     acc.fg2m = (acc.fg2m || 0) + (parseInt(game.fg2m, 10) || 0);
@@ -171,6 +176,7 @@ export default function Dashboard({
       startIndex + GAMES_PER_PAGE
     );
   }, [sortedAndFilteredStats, currentPage]);
+  
   const totalPages = Math.ceil(sortedAndFilteredStats.length / GAMES_PER_PAGE);
 
   // Stat graph handler
@@ -202,13 +208,18 @@ export default function Dashboard({
     }
   };
 
-  // Multi-select handlers
+  // Multi-select handlers with admin checks
   const toggleSelectionMode = () => {
+    if (!isUserAdmin) {
+      showAccessDenied('select and delete games');
+      return;
+    }
     setIsSelectionMode(!isSelectionMode);
     setSelectedGameIds([]);
   };
 
   const toggleGameSelection = (gameId) => {
+    if (!isUserAdmin) return;
     setSelectedGameIds(prev => 
       prev.includes(gameId) 
         ? prev.filter(id => id !== gameId)
@@ -217,6 +228,7 @@ export default function Dashboard({
   };
 
   const selectAllGames = () => {
+    if (!isUserAdmin) return;
     const currentPageGameIds = paginatedStats.map(game => game.id);
     setSelectedGameIds(currentPageGameIds);
   };
@@ -226,6 +238,10 @@ export default function Dashboard({
   };
 
   const handleBulkDelete = () => {
+    if (!canDelete(user)) {
+      showAccessDenied('delete games');
+      return;
+    }
     setShowBulkDeleteConfirm(true);
   };
 
@@ -238,23 +254,39 @@ export default function Dashboard({
     setShowBulkDeleteConfirm(false);
   };
 
-  // Deleting logic
-  const handleDeleteClick = (gameId) => setDeletingGameId(gameId);
+  // Delete handlers with admin checks
+  const handleDeleteClick = (gameId) => {
+    if (!canDelete(user)) {
+      showAccessDenied('delete games');
+      return;
+    }
+    setDeletingGameId(gameId);
+  };
+
   const confirmDeleteGame = () => {
     if (deletingGameId) {
       onDeleteGame(deletingGameId);
       setDeletingGameId(null);
     }
   };
-  const handleDeleteTeamClick = (teamId) => setDeletingTeamId(teamId);
+
+  const handleDeleteTeamClick = (teamId) => {
+    if (!canDelete(user)) {
+      showAccessDenied('delete teams');
+      return;
+    }
+    setDeletingTeamId(teamId);
+  };
+
   const confirmDeleteTeam = () => {
     if (deletingTeamId) {
       onDeleteTeam(deletingTeamId);
       setDeletingTeamId(null);
     }
   };
+
   const toggleExpandGame = (gameId) => {
-    if (isSelectionMode) return; // Don't expand in selection mode
+    if (isSelectionMode) return;
     setExpandedGameIds((prev) =>
       prev.includes(gameId)
         ? prev.filter((id) => id !== gameId)
@@ -262,9 +294,13 @@ export default function Dashboard({
     );
   };
 
-  // Add new team
+  // Add new team with admin check
   const handleTeamSubmit = (e) => {
     e.preventDefault();
+    if (!canWrite(user)) {
+      showAccessDenied('add teams');
+      return;
+    }
     if (newTeamName.trim()) {
       onAddTeam(newTeamName.trim());
       setNewTeamName("");
@@ -274,11 +310,12 @@ export default function Dashboard({
   // Helper to show zero for blank/undefined stat
   const showZero = (val) => (val === undefined || val === null || val === "" ? 0 : val);
 
-  // --- Opponent Suggestion handlers ---
+  // Opponent suggestion handlers
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setShowOpponentSuggestions(true);
   };
+  
   const handleOpponentSuggestionClick = (opp) => {
     setSearchTerm(opp);
     setShowOpponentSuggestions(false);
@@ -305,14 +342,13 @@ export default function Dashboard({
         <StatGraphModal graphData={graphData} onClose={() => setGraphData(null)} />
       )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Career stats & teams */}
+        {/* Career stats */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
             <h3 className="text-xl font-bold mb-4 text-orange-500">
               Career Totals
             </h3>
             <div className="grid grid-cols-3 gap-3 text-center">
-              {/* Games Played stat card (clickable!) */}
               <StatCard
                 label="Games Played"
                 value={aggregatedStats.gamesPlayed || 0}
@@ -388,6 +424,7 @@ export default function Dashboard({
             </div>
           </div>
         </div>
+
         {/* Game History */}
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
           <div
@@ -399,6 +436,7 @@ export default function Dashboard({
               Game History
             </h2>
           </div>
+          
           {isHistoryVisible && (
             <>
               {/* Show filter status when filters come from header */}
@@ -418,53 +456,55 @@ export default function Dashboard({
                 </div>
               )}
 
-              {/* Multi-select controls */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={toggleSelectionMode}
-                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                      isSelectionMode 
-                        ? 'bg-orange-500 text-white' 
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {isSelectionMode ? 'Cancel' : 'Select'}
-                  </button>
+              {/* Multi-select controls - Only show for admins */}
+              {isUserAdmin && (
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleSelectionMode}
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                        isSelectionMode 
+                          ? 'bg-orange-500 text-white' 
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {isSelectionMode ? 'Cancel' : 'Select'}
+                    </button>
+                    
+                    {isSelectionMode && (
+                      <>
+                        <button
+                          onClick={selectAllGames}
+                          className="px-2 py-1 rounded text-xs bg-blue-500 text-white hover:bg-blue-600"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={deselectAllGames}
+                          className="px-2 py-1 rounded text-xs bg-gray-500 text-white hover:bg-gray-600"
+                        >
+                          Clear
+                        </button>
+                      </>
+                    )}
+                  </div>
                   
-                  {isSelectionMode && (
-                    <>
+                  {isSelectionMode && selectedGameIds.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedGameIds.length} selected
+                      </span>
                       <button
-                        onClick={selectAllGames}
-                        className="px-2 py-1 rounded text-xs bg-blue-500 text-white hover:bg-blue-600"
+                        onClick={handleBulkDelete}
+                        className="px-3 py-1 rounded text-sm bg-red-500 text-white hover:bg-red-600 flex items-center gap-1"
                       >
-                        Select All
+                        <TrashIcon />
+                        Delete Selected
                       </button>
-                      <button
-                        onClick={deselectAllGames}
-                        className="px-2 py-1 rounded text-xs bg-gray-500 text-white hover:bg-gray-600"
-                      >
-                        Clear
-                      </button>
-                    </>
+                    </div>
                   )}
                 </div>
-                
-                {isSelectionMode && selectedGameIds.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedGameIds.length} selected
-                    </span>
-                    <button
-                      onClick={handleBulkDelete}
-                      className="px-3 py-1 rounded text-sm bg-red-500 text-white hover:bg-red-600 flex items-center gap-1"
-                    >
-                      <TrashIcon />
-                      Delete Selected
-                    </button>
-                  </div>
-                )}
-              </div>
+              )}
               
               <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-2">
                 {paginatedStats.length > 0 ? (
@@ -480,11 +520,11 @@ export default function Dashboard({
                         {/* Header row with optional checkbox */}
                         <div
                           className="p-4 flex items-center justify-between cursor-pointer"
-                          onClick={() => isSelectionMode ? toggleGameSelection(game.id) : toggleExpandGame(game.id)}
+                          onClick={() => isSelectionMode && isUserAdmin ? toggleGameSelection(game.id) : toggleExpandGame(game.id)}
                         >
                           <div className="flex items-center gap-2">
-                            {/* Selection checkbox - subtle design */}
-                            {isSelectionMode && (
+                            {/* Selection checkbox - only for admins */}
+                            {isSelectionMode && isUserAdmin && (
                               <div
                                 className={`w-5 h-5 rounded border-2 flex items-center justify-center mr-2 transition-colors ${
                                   isSelected 
@@ -500,7 +540,7 @@ export default function Dashboard({
                               </div>
                             )}
                             
-                            {!isSelectionMode && (
+                            {(!isSelectionMode || !isUserAdmin) && (
                               <ChevronRightIcon
                                 className={`transition-transform duration-200 text-black dark:text-white ${
                                   expanded ? "rotate-90" : ""
@@ -541,8 +581,8 @@ export default function Dashboard({
                             >
                               {game.outcome || "T"} {showZero(game.myTeamScore)}-{showZero(game.opponentScore)}
                             </span>
-                            {/* Trash icon - hidden in selection mode */}
-                            {!isSelectionMode && (
+                            {/* Trash icon - only show for admins and not in selection mode */}
+                            {isUserAdmin && !isSelectionMode && (
                               <button
                                 className="p-1 text-red-300 hover:text-red-500 rounded transition"
                                 onClick={(e) => {
@@ -610,11 +650,14 @@ export default function Dashboard({
                               />
                             </div>
                             <BadgeDisplay badges={earnedBadges} />
-                            <PhotoUpload 
-                              gameId={game.id} 
-                              photos={game.photos || []} 
-                              onPhotosUpdate={onUpdateGamePhotos || (() => console.error("onUpdateGamePhotos not provided"))}
-                            />
+                            {/* Only show photo upload for admins */}
+                            {isUserAdmin && (
+                              <PhotoUpload 
+                                gameId={game.id} 
+                                photos={game.photos || []} 
+                                onPhotosUpdate={onUpdateGamePhotos || (() => console.error("onUpdateGamePhotos not provided"))}
+                              />
+                            )}
                           </div>
                         )}
                       </div>
@@ -655,8 +698,8 @@ export default function Dashboard({
         </div>
       </div>
       
-      {/* Bulk Delete confirmation modal */}
-      {showBulkDeleteConfirm && (
+      {/* Bulk Delete confirmation modal - only for admins */}
+      {isUserAdmin && showBulkDeleteConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm mx-auto">
             <h3 className="text-lg font-bold mb-4 text-red-500">
@@ -683,8 +726,8 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Delete confirmation modal */}
-      {deletingGameId && (
+      {/* Delete confirmation modal - only for admins */}
+      {isUserAdmin && deletingGameId && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm mx-auto">
             <h3 className="text-lg font-bold mb-4 text-red-500">
@@ -715,8 +758,9 @@ export default function Dashboard({
           </div>
         </div>
       )}
-      {/* Delete Team Modal */}
-      {deletingTeamId && (
+      
+      {/* Delete Team Modal - only for admins */}
+      {isUserAdmin && deletingTeamId && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm mx-auto">
             <h3 className="text-lg font-bold mb-4 text-red-500">

@@ -12,6 +12,19 @@ export default function AuthScreen({ onSignIn }) {
         <p className="text-gray-600 dark:text-gray-300 mt-2 mb-6">
           Track stats, progress, and share with family.
         </p>
+        
+        {/* Sign in messaging - SIMPLIFIED */}
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+            <strong>🏀 Welcome to Sahil's Stats!</strong>
+          </p>
+          <p className="text-xs text-blue-700 dark:text-blue-300">
+            • Anyone can view games and stats
+            • Family admins can sign in to create and manage games
+            • Click the basketball logo above to view the dashboard
+          </p>
+        </div>
+        
         <button
           onClick={onSignIn}
           className="w-full bg-white dark:bg-gray-100 hover:bg-gray-50 dark:hover:bg-gray-200 text-gray-700 dark:text-gray-800 font-medium py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center border border-gray-300 dark:border-gray-400 shadow-sm"
@@ -27,6 +40,10 @@ export default function AuthScreen({ onSignIn }) {
           </svg>
           Sign in with Google
         </button>
+        
+        <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+          No sign-in required to view live games
+        </div>
       </div>
     </div>
   );

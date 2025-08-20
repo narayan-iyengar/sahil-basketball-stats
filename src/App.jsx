@@ -10,17 +10,26 @@ import Header from "./Header";
 import AuthScreen from "./AuthScreen";
 import LiveGameAdmin from "./LiveGameAdmin";
 import LiveGameViewer from "./LiveGameViewer";
-import StatEntry from "./StatEntry"; // Import the unified stat entry component
-
+import StatEntry from "./StatEntry";
 import SettingsModal from "./SettingsModal";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
 
+// Import admin utilities
+import { 
+  isAdmin, 
+  canWrite, 
+  canDelete, 
+  canAccessSettings, 
+  canManageLiveGames,
+  getUserRole,
+  showAccessDenied 
+} from "./components/adminUtils";
 
 export default function App() {
   // Auth & User
   const [user, setUser] = useState(null);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [theme, setTheme] = useState(() => {
-    // Load theme from localStorage with fallback
     return localStorage.getItem("theme") || "light";
   });
   const [loading, setLoading] = useState(true);
@@ -32,7 +41,7 @@ export default function App() {
   const [games, setGames] = useState([]);
   const [stats, setStats] = useState([]);
   const [liveGameId, setLiveGameId] = useState(null);
-  const [currentGameConfig, setCurrentGameConfig] = useState(null); // For stat entry
+  const [currentGameConfig, setCurrentGameConfig] = useState(null);
 
   // Settings Modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -46,18 +55,14 @@ export default function App() {
   });
   const [globalNumPeriods, setGlobalNumPeriods] = useState(2);
 
-
-
-
   // --- AUTH LOGIC ---
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
+      setIsUserAdmin(isAdmin(u));
       setLoading(false);
-
     });
     return unsub;
- //   // eslint-disable-next-line
   }, []);
 
   // --- THEME LOGIC ---
@@ -65,6 +70,7 @@ export default function App() {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("theme", theme);
   }, [theme]);
+  
   const toggleTheme = useCallback(() => setTheme((t) => (t === "dark" ? "light" : "dark")), []);
 
   // --- DATA LOADERS ---
@@ -76,6 +82,7 @@ export default function App() {
     });
     return unsub;
   }, [user]);
+
   useEffect(() => {
     if (!user) return;
     const gamesCol = collection(db, "games");
@@ -85,6 +92,7 @@ export default function App() {
     });
     return unsub;
   }, [user]);
+
   useEffect(() => {
     if (!user) return;
     const statsCol = collection(db, "stats");
@@ -93,9 +101,6 @@ export default function App() {
     });
     return unsub;
   }, [user]);
-
-
-  
 
   // --- LIVE GAME ID TRACKER ---
   useEffect(() => {
@@ -110,7 +115,6 @@ export default function App() {
       setLiveGameLoading(false);
     });
     return () => unsub();
-    // eslint-disable-next-line
   }, [page]);
 
   // --- LIVE PAGE REDIRECT (Anonymous Viewer) ---
@@ -120,47 +124,72 @@ export default function App() {
     }
   }, [user, liveGameId, page]);
 
-  // --- CRUD CALLBACKS ---
+  // --- ADMIN-PROTECTED OPERATIONS ---
 
-const handleUpdateGamePhotos = async (gameId, photos) => {
-  try {
-    await updateDoc(doc(db, "games", gameId), { photos });
-    // Update local state
-    setGames((games) => 
-      games.map((game) => 
-        game.id === gameId ? { ...game, photos } : game
-      )
-    );
-  } catch (error) {
-    console.error("Error updating game photos:", error);
-  }
-};
-  // --- TEAM & GAME LOGIC ---
+  const handleUpdateGamePhotos = async (gameId, photos) => {
+    if (!canWrite(user)) {
+      showAccessDenied('update game photos');
+      return;
+    }
+    
+    try {
+      await updateDoc(doc(db, "games", gameId), { photos });
+      setGames((games) => 
+        games.map((game) => 
+          game.id === gameId ? { ...game, photos } : game
+        )
+      );
+    } catch (error) {
+      console.error("Error updating game photos:", error);
+    }
+  };
+
   const handleDeleteTeam = useCallback(async (teamId) => {
+    if (!canDelete(user)) {
+      showAccessDenied('delete teams');
+      return;
+    }
+    
     await deleteDoc(doc(db, "teams", teamId));
     setTeams((teams) => teams.filter((t) => t.id !== teamId));
-  }, []);
+  }, [user]);
+
   const handleAddTeam = async (teamName) => {
+    if (!canWrite(user)) {
+      showAccessDenied('add teams');
+      return null;
+    }
+    
     const exists = teams.some((team) => team.name.toLowerCase() === teamName.toLowerCase());
     if (exists) return null;
+    
     const docRef = await addDoc(collection(db, "teams"), { name: teamName });
     setTeams((t) => [...t, { name: teamName, id: docRef.id }]);
     return { name: teamName, id: docRef.id };
   };
+
   const handleAddGame = useCallback(async (game) => {
+    if (!canWrite(user)) {
+      showAccessDenied('add games');
+      return;
+    }
+    
     const docRef = await addDoc(collection(db, "games"), game);
     setGames((g) => [...g, { ...game, id: docRef.id }]);
-  }, []);
+  }, [user]);
+
   const handleAddStat = useCallback(async (stat) => {
-    // Calculate points from the stat data
+    if (!canWrite(user)) {
+      showAccessDenied('add statistics');
+      return;
+    }
+    
     const points = (stat.fg2m * 2) + (stat.fg3m * 3) + stat.ftm;
     
-    // Determine outcome
     let outcome = "T";
     if (stat.myTeamScore > stat.opponentScore) outcome = "W";
     else if (stat.myTeamScore < stat.opponentScore) outcome = "L";
 
-    // Create the final game record
     const gameRecord = {
       ...currentGameConfig,
       ...stat,
@@ -174,19 +203,28 @@ const handleUpdateGamePhotos = async (gameId, photos) => {
     const docRef = await addDoc(collection(db, "games"), gameRecord);
     setGames((g) => [...g, { ...gameRecord, id: docRef.id }]);
     
-    // Clear the config and return to dashboard
     setCurrentGameConfig(null);
     setPage("dashboard");
   }, [currentGameConfig, user]);
 
   const handleDeleteGame = useCallback(async (gameId) => {
+    if (!canDelete(user)) {
+      showAccessDenied('delete games');
+      return;
+    }
+    
     await deleteDoc(doc(db, "games", gameId));
     setGames((g) => g.filter((x) => x.id !== gameId));
     setStats((s) => s.filter((x) => x.gameId !== gameId));
-  }, []);
+  }, [user]);
 
   // --- END GAME LOGIC ---
   const handleEndGame = async (liveGameId) => {
+    if (!canManageLiveGames(user)) {
+      showAccessDenied('manage live games');
+      return;
+    }
+    
     try {
       const liveGameRef = doc(db, "liveGames", liveGameId);
       const liveGameSnap = await getDoc(liveGameRef);
@@ -194,14 +232,17 @@ const handleUpdateGamePhotos = async (gameId, photos) => {
         console.log("Live game not found for endGame, id:", liveGameId);
         return;
       }
+      
       const adminName = user?.displayName ? user.displayName.split(" ")[0] : "";
       const gameData = liveGameSnap.data();
       const playerStats = gameData.playerStats || {};
       const myTeamScore = gameData.homeScore ?? 0;
       const opponentScore = gameData.awayScore ?? 0;
+      
       let outcome = "T";
       if (myTeamScore > opponentScore) outcome = "W";
       else if (myTeamScore < opponentScore) outcome = "L";
+      
       const finalGame = {
         ...gameData,
         myTeamScore,
@@ -227,10 +268,12 @@ const handleUpdateGamePhotos = async (gameId, photos) => {
         adminName,
         isRunning: false
       };
+      
       const docRef = await addDoc(collection(db, "games"), finalGame);
       await deleteDoc(liveGameRef);
       setLiveGameId(null);
       setPage("game_setup");
+      
       const gamesCol = collection(db, "games");
       const snap = await getDocs(gamesCol);
       setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -241,40 +284,67 @@ const handleUpdateGamePhotos = async (gameId, photos) => {
 
   // --- DELETE ALL LIVE GAMES ---
   const handleDeleteAllLiveGames = async () => {
-if (!user) return null;
-    //if (!window.confirm("Are you sure you want to delete ALL live games?")) return;
+    if (!canManageLiveGames(user)) {
+      showAccessDenied('delete live games');
+      return;
+    }
+    
     const snapshot = await getDocs(collection(db, "liveGames"));
     for (let gameDoc of snapshot.docs) {
       await deleteDoc(doc(db, "liveGames", gameDoc.id));
     }
-    //alert("All live games cleaned up!"); 
-
     setLiveGameId(null);
   };
 
   // --- NAV HELPERS ---
   const handleSignIn = async () => {
-    await signInWithPopup(auth, provider);
-  };
-const handleSignOut = async () => {
-  try {
-    if (page === "live_admin" && liveGameId) {
-      await handleEndGame(liveGameId);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const signedInUser = result.user;
+      
+      // Check if the user is an admin
+      if (!isAdmin(signedInUser)) {
+        // Not an admin - sign them out and show error
+        await signOut(auth);
+        alert(`Access denied. Only family administrators can sign in.\n\nYour email: ${signedInUser.email}\n\nTo view games, you can browse without signing in.`);
+        return;
+      }
+      
+      // User is an admin - they'll be automatically set by the auth state listener
+    } catch (error) {
+      console.error("Sign in error:", error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup, no need to show error
+        return;
+      }
+      alert("Sign in failed. Please try again.");
     }
-    await signOut(auth); // <-- Firebase sign out
-    setUser(null);
-    setPage("game_setup"); 
-    setLiveGameId(null);
-    setGames([]);
-    setStats([]);
-    // Any other state you want to clear?
-  } catch (err) {
-    console.error("Error signing out:", err);
-  }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      if (page === "live_admin" && liveGameId && isUserAdmin) {
+        await handleEndGame(liveGameId);
+      }
+      await signOut(auth);
+      setUser(null);
+      setIsUserAdmin(false);
+      setPage("game_setup"); 
+      setLiveGameId(null);
+      setGames([]);
+      setStats([]);
+    } catch (err) {
+      console.error("Error signing out:", err);
+    }
   };
 
   // Handle new game (setup new or live)
   const handleSubmitGame = async (config, mode) => {
+    if (!canWrite(user)) {
+      showAccessDenied('create games');
+      return;
+    }
+    
     const newGame = {
       ...config,
       createdBy: user?.uid || null,
@@ -296,19 +366,29 @@ const handleSignOut = async () => {
       periodLength: globalPeriodLength || 20,
       numPeriods: globalGameFormat === "halves" ? 2 : 4,
     };
+    
     if (mode === "live") {
+      if (!canManageLiveGames(user)) {
+        showAccessDenied('start live games');
+        return;
+      }
       const docRef = await addDoc(collection(db, "liveGames"), newGame);
       setLiveGameId(docRef.id);
       setPage("live_admin");
     } else {
-      // For final games, set up the stat entry form
       setCurrentGameConfig(newGame);
       setPage("add_stat");
     }
   };
 
-
-
+  // Settings modal handler
+  const openSettingsModal = () => {
+    if (!canAccessSettings(user)) {
+      showAccessDenied('access settings');
+      return;
+    }
+    setSettingsOpen(true);
+  };
 
   // --- PAGE RENDER LOGIC ---
   if (loading || liveGameLoading) {
@@ -320,37 +400,39 @@ const handleSignOut = async () => {
     );
   }
 
-if (!user && page === "live_viewer") {
-  if (liveGameId) {
-    return (
-      <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
-        <Header
-          user={null}
-          db={db}
-          onSignOut={handleSignOut}
-          setPage={setPage}
-          theme={theme}
-          toggleTheme={toggleTheme}
-          page={page}
-          liveGameId={liveGameId}
-          goToLiveGame={() => setPage("live_viewer")}
-          onDeleteAllLiveGames={handleDeleteAllLiveGames}
-          openSettingsModal={() => setSettingsOpen(true)}
-          onSignIn={handleSignIn}
-        />
-        <main className="flex-1">
-          <LiveGameViewer
-            db={db}
+  // Anonymous viewer logic
+  if (!user && page === "live_viewer") {
+    if (liveGameId) {
+      return (
+        <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
+          <Header
             user={null}
-            gameId={liveGameId}
+            db={db}
+            onSignOut={handleSignOut}
             setPage={setPage}
-            teams={teams}
-            stats={stats}
-            games={games}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            page={page}
+            liveGameId={liveGameId}
+            goToLiveGame={() => setPage("live_viewer")}
+            onDeleteAllLiveGames={handleDeleteAllLiveGames}
+            openSettingsModal={openSettingsModal}
+            onSignIn={handleSignIn}
+            isUserAdmin={false}
           />
-        </main>
-      </div>
-    );
+          <main className="flex-1">
+            <LiveGameViewer
+              db={db}
+              user={null}
+              gameId={liveGameId}
+              setPage={setPage}
+              teams={teams}
+              stats={stats}
+              games={games}
+            />
+          </main>
+        </div>
+      );
     } else {
       return (
         <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
@@ -365,7 +447,8 @@ if (!user && page === "live_viewer") {
             liveGameId={liveGameId}
             goToLiveGame={() => setPage("live_viewer")}
             onDeleteAllLiveGames={handleDeleteAllLiveGames}
-            openSettingsModal={() => setSettingsOpen(true)}
+            openSettingsModal={openSettingsModal}
+            isUserAdmin={false}
           />
           <main className="flex-1 flex items-center justify-center">
             <div className="text-2xl text-gray-400 text-center">
@@ -377,12 +460,51 @@ if (!user && page === "live_viewer") {
     }
   }
 
-  // Show login screen if not authenticated, and NOT a live viewer
+  // Show login screen if not authenticated
   if (!user && page !== "live_viewer") {
     return <AuthScreen onSignIn={handleSignIn} />;
   }
 
-  // Only show Dashboard, setup, etc if authenticated!
+  // Show access denied for non-admin trying to access admin pages
+  if (user && !isUserAdmin && (page === "game_setup" || page === "add_stat" || page === "live_admin")) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
+        <Header
+          user={user}
+          db={db}
+          onSignOut={handleSignOut}
+          setPage={setPage}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          page={page}
+          liveGameId={liveGameId}
+          goToLiveGame={() => setPage("live_viewer")}
+          onDeleteAllLiveGames={handleDeleteAllLiveGames}
+          openSettingsModal={openSettingsModal}
+          isUserAdmin={isUserAdmin}
+        />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="max-w-md mx-auto text-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+            <h2 className="text-2xl font-bold text-red-500 mb-4">Access Restricted</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              You don't have permission to access this feature. Only administrators can create and manage games.
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              User role: <span className="font-medium">{getUserRole(user)}</span>
+            </p>
+            <button
+              onClick={() => setPage("dashboard")}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Main authenticated app
   return (
     <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
       <Header
@@ -396,8 +518,10 @@ if (!user && page === "live_viewer") {
         liveGameId={liveGameId}
         goToLiveGame={() => setPage("live_viewer")}
         onDeleteAllLiveGames={handleDeleteAllLiveGames}
-        openSettingsModal={() => setSettingsOpen(true)}
+        openSettingsModal={openSettingsModal}
+        isUserAdmin={isUserAdmin}
       />
+      
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -413,8 +537,9 @@ if (!user && page === "live_viewer") {
         setPage={setPage}
         onDeleteAllLiveGames={handleDeleteAllLiveGames}
       />
+      
       <main className="flex-1">
-        {user && page === "game_setup" && (
+        {user && isUserAdmin && page === "game_setup" && (
           <GameSetup
             user={user}
             teams={teams}
@@ -430,6 +555,7 @@ if (!user && page === "live_viewer") {
             numPeriods={globalNumPeriods}
           />
         )}
+        
         {user && page === "dashboard" && (
           <Dashboard
             user={user}
@@ -439,10 +565,12 @@ if (!user && page === "live_viewer") {
             onDeleteGame={handleDeleteGame}
             onDeleteTeam={handleDeleteTeam}
             onAddTeam={handleAddTeam}
-            onUpdateGamePhotos={handleUpdateGamePhotos} 
+            onUpdateGamePhotos={handleUpdateGamePhotos}
+            isUserAdmin={isUserAdmin}
           />
         )}
-        {user && page === "add_stat" && currentGameConfig && (
+        
+        {user && isUserAdmin && page === "add_stat" && currentGameConfig && (
           <StatEntry
             gameConfig={currentGameConfig}
             isLive={false}
@@ -453,7 +581,8 @@ if (!user && page === "live_viewer") {
             }}
           />
         )}
-        {user && page === "live_admin" && liveGameId && (
+        
+        {user && isUserAdmin && page === "live_admin" && liveGameId && (
           <LiveGameAdmin
             user={user}
             db={db}
@@ -465,6 +594,7 @@ if (!user && page === "live_viewer") {
             onEndGame={handleEndGame}
           />
         )}
+        
         {user && page === "live_viewer" && liveGameId && (
           <LiveGameViewer
             db={db}
