@@ -1,10 +1,11 @@
+// firebase.jsx - Add anonymous auth support
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getDatabase } from "firebase/database"; 
+import { getAuth, GoogleAuthProvider, signInAnonymously } from "firebase/auth";
 
 
 const firebaseConfig = {
+  // Your existing config
   apiKey: "AIzaSyCR6PTJ8tfCJy9qZWcp8dW-9UH4ko0yL4M",
   authDomain: "sahil-stats-tracker.firebaseapp.com",
   projectId: "sahil-stats-tracker",
@@ -19,4 +20,16 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const provider = new GoogleAuthProvider();
-export const rtdb = getDatabase(app);
+
+
+// Helper function for anonymous sign-in
+export const signInAnonymousUser = async () => {
+  try {
+    const result = await signInAnonymously(auth);
+    console.log("Anonymous user signed in:", result.user.uid);
+    return result.user;
+  } catch (error) {
+    console.error("Error signing in anonymously:", error);
+    throw error;
+  }
+};

@@ -4,7 +4,6 @@ import StatStepperGroup from "./StatStepperGroup";
 import StatStepper from "./StatStepper";
 import SaveStatusIndicator from "./SaveStatusIndicator";
 import { ShareIcon } from "./icons";
-import { setPresence, removePresence } from "./presence";
 import { db } from "./firebase";
 
 // Expandable bar icon
@@ -29,21 +28,6 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
   const displayInterval = useRef(null);
   const lastPeriodRef = useRef(null);
 
-  // --- Presence Management ---
-  useEffect(() => {
-    if (!user) return;
-    setPresence(user, "admin");
-    const cleanupPresence = () => removePresence(user, "admin");
-    window.addEventListener("beforeunload", cleanupPresence);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") cleanupPresence();
-    });
-    return () => {
-      cleanupPresence();
-      window.removeEventListener("beforeunload", cleanupPresence);
-      document.removeEventListener("visibilitychange", cleanupPresence);
-    };
-  }, [user]);
 
   // --- Listen to game state from Firestore ---
   useEffect(() => {

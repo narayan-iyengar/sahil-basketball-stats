@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { auth, db, rtdb, provider } from "./firebase";
+import { auth, db, provider } from "./firebase";
 import {
   collection, doc, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot,
 } from "firebase/firestore";
@@ -11,10 +11,10 @@ import AuthScreen from "./AuthScreen";
 import LiveGameAdmin from "./LiveGameAdmin";
 import LiveGameViewer from "./LiveGameViewer";
 import StatEntry from "./StatEntry"; // Import the unified stat entry component
-import { listenPresence, setPresence, removePresence } from "./presence";
+
 import SettingsModal from "./SettingsModal";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
-import { ref, onDisconnect, set, serverTimestamp } from 'firebase/database'; // Add these imports
+
 
 export default function App() {
   // Auth & User
@@ -46,24 +46,19 @@ export default function App() {
   });
   const [globalNumPeriods, setGlobalNumPeriods] = useState(2);
 
-  // Presence State
-  const [admins, setAdmins] = useState([]);
-  const [viewers, setViewers] = useState([]);
+
 
 
   // --- AUTH LOGIC ---
- // useEffect(() => {
- //   const unsub = onAuthStateChanged(auth, (u) => {
- //     setUser(u);
- //     setLoading(false);
- //     if (!u) {
- //       removePresence(user, "viewer", liveGameId);
- //       removePresence(user, "admin", liveGameId);
- //     }
- //   });
- //   return unsub;
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+
+    });
+    return unsub;
  //   // eslint-disable-next-line
- // }, []);
+  }, []);
 
   // --- THEME LOGIC ---
   useEffect(() => {
@@ -99,53 +94,6 @@ export default function App() {
     return unsub;
   }, [user]);
 
-  // --- PRESENCE LOGIC ---
- // useEffect(() => {
- //   if (!user) return;
- //   setPresence(user, "admin");
- //   const unsub = listenPresence("admin", null, (arr) => setAdmins(arr || []));
- //   return () => {
- //     removePresence(user, "admin");
- //     if (unsub && typeof unsub === "function") unsub();
- //   };
- // }, [user]);
- // useEffect(() => {
- //   const unsub = listenPresence("viewer", null, (arr) => setViewers(arr || []));
- //   return () => {
- //     if (unsub && typeof unsub === "function") unsub();
- //   };
- // }, []);
-
-  // --- CONSOLIDATED AUTH & PRESENCE LOGIC ---
-  useEffect(() => {
-    // This listener is the single source of truth for auth state
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setLoading(false);
-      setUser(user); // Continue to set your React state
-
-      if (user) {
-        // User is signed IN. It's now safe to set their presence.
-        const presenceRef = ref(rtdb, `presence/admins/${user.uid}`);
-        
-        // Use onDisconnect() for reliable, server-side cleanup.
-        // This automatically removes the user's presence when they disconnect.
-        onDisconnect(presenceRef).remove();
-
-        // Now, set the presence data. This will succeed.
-        set(presenceRef, {
-          uid: user.uid,
-          name: user.displayName || "Admin",
-          ts: serverTimestamp(),
-        });
-
-      }
-      // Note: No 'else' block is needed to remove presence,
-      // because onDisconnect() handles it automatically.
-    });
-
-    // Cleanup the listener when the app unmounts
-    return () => unsub();
-  }, []); // The empty dependency array [] ensures this runs only once.
 
   
 
@@ -308,24 +256,17 @@ if (!user) return null;
   const handleSignIn = async () => {
     await signInWithPopup(auth, provider);
   };
-  const handleSignOut = async () => {
-try {
-    // Remove admin presence if user was scoring
-    removePresence(user, "viewer", liveGameId);
-    if (user) {
-      removePresence(user, "admin");
-    }
+const handleSignOut = async () => {
+  try {
     if (page === "live_admin" && liveGameId) {
-  await handleEndGame(liveGameId);
-}
+      await handleEndGame(liveGameId);
+    }
     await signOut(auth); // <-- Firebase sign out
     setUser(null);
     setPage("game_setup"); 
     setLiveGameId(null);
     setGames([]);
     setStats([]);
-    setAdmins([]);
-    setViewers([]);
     // Any other state you want to clear?
   } catch (err) {
     console.error("Error signing out:", err);
@@ -390,8 +331,6 @@ if (!user && page === "live_viewer") {
           setPage={setPage}
           theme={theme}
           toggleTheme={toggleTheme}
-          admins={admins}
-          viewers={viewers}
           page={page}
           liveGameId={liveGameId}
           goToLiveGame={() => setPage("live_viewer")}
@@ -422,8 +361,6 @@ if (!user && page === "live_viewer") {
             setPage={setPage}
             theme={theme}
             toggleTheme={toggleTheme}
-            admins={admins}
-            viewers={viewers}
             page={page}
             liveGameId={liveGameId}
             goToLiveGame={() => setPage("live_viewer")}
@@ -455,8 +392,6 @@ if (!user && page === "live_viewer") {
         setPage={setPage}
         theme={theme}
         toggleTheme={toggleTheme}
-        admins={admins}
-        viewers={viewers}
         page={page}
         liveGameId={liveGameId}
         goToLiveGame={() => setPage("live_viewer")}

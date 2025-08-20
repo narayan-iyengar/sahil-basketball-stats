@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { BasketballIcon } from "./icons";
-import { setPresence, listenPresence, removePresence } from "./presence";
 import { v4 as uuidv4 } from "uuid";
+import { signInAnonymousUser } from "./firebase";
+
+
 
 // Generate a random "anonymous" session id for non-logged-in viewers
 function getAnonViewer() {
@@ -19,38 +21,25 @@ function getAnonViewer() {
 export default function LiveGameViewer({ db, gameId, appId, user }) {
   const [game, setGame] = useState(null);
   const [error, setError] = useState(null);
-  const [viewers, setViewers] = useState([]);
   const [displayClock, setDisplayClock] = useState(0);
   const [displayClockTenths, setDisplayClockTenths] = useState(0); // For tenths of seconds
   const displayInterval = useRef(null);
 
   // Use logged-in user if available, else a guest user object
-  const presenceUser = user || getAnonViewer();
+  const [authUser, setAuthUser] = useState(user);
 
-  // Presence logic (remove presence on tab close or page unload)
-  useEffect(() => {
-    if (!gameId) return;
-    setPresence(presenceUser, "viewer", gameId);
-    const off = listenPresence("viewer", gameId, setViewers);
 
-    const cleanupPresence = () => {
-      removePresence(presenceUser, "viewer", gameId);
-    };
+    useEffect(() => {
+    // If no user provided, sign in anonymously
+    if (!user) {
+      signInAnonymousUser()
+        .then(setAuthUser)
+        .catch(console.error);
+    } else {
+      setAuthUser(user);
+    }
+  }, [user]);
 
-    window.addEventListener("beforeunload", cleanupPresence);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        cleanupPresence();
-      }
-    });
-
-    return () => {
-      cleanupPresence();
-      if (typeof off === "function") off();
-      window.removeEventListener("beforeunload", cleanupPresence);
-      document.removeEventListener("visibilitychange", cleanupPresence);
-    };
-  }, [user, gameId]);
 
   // Live game data logic
   useEffect(() => {
@@ -203,31 +192,22 @@ export default function LiveGameViewer({ db, gameId, appId, user }) {
         <p>You are viewing a live game. The score and stats update automatically.</p>
       </div>
       {/* --- SAHIL LIVE STATS CARD --- */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <BasketballIcon className="text-orange-500 h-5 w-5 animate-spin-slow" />
-          <span className="font-bold text-orange-500 text-lg">Sahil's Live Stats</span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {statCards.map(card => (
-            <div
-              key={card.label}
-              className="bg-gray-100 dark:bg-gray-900 rounded-lg p-3 flex flex-col items-center"
-            >
-              <span className="text-xs text-orange-500 font-semibold">{card.label}</span>
-              <span className="text-xl font-bold text-gray-900 dark:text-gray-100">{card.value}</span>
-            </div>
-          ))}
-        </div>
+<div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+  <div className="mb-2 flex items-center justify-center gap-2">
+    <span className="font-bold text-orange-500 text-lg">Live Stats</span>
+  </div>
+  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+    {statCards.map(card => (
+      <div
+        key={card.label}
+        className="bg-gray-100 dark:bg-gray-900 rounded-lg p-3 flex flex-col items-center"
+      >
+        <span className="text-xs text-orange-500 font-semibold">{card.label}</span>
+        <span className="text-xl font-bold text-gray-900 dark:text-gray-100">{card.value}</span>
       </div>
-
-      {/* Show presence count */}
-      <div className="text-center mt-4 text-xs text-gray-500">
-        <span className="inline-flex items-center gap-1">
-          <span className="bg-green-400 rounded-full w-2 h-2 animate-pulse"></span>
-          {viewers.length} {viewers.length === 1 ? "viewer" : "viewers"} currently watching
-        </span>
-      </div>
+    ))}
+  </div>
+</div>
     </div>
   );
 }

@@ -19,8 +19,6 @@ const BlinkingDot = ({ active }) => (
 
 export default function Header({
   user,
-  admins = [],
-  viewers = [],
   onSignOut,
   setPage,
   theme,
@@ -113,15 +111,7 @@ export default function Header({
             {/* Settings Button - Always visible */}
             <button
               onClick={openSettingsModal}
-              className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all border-2 ${
-                admins.length === 0 
-                  ? 'border-transparent' 
-                  : admins.length === 1
-                  ? 'border-blue-300 shadow-sm shadow-blue-300/30'
-                  : admins.length === 2
-                  ? 'border-blue-400 shadow-md shadow-blue-400/40'
-                  : 'border-blue-500 shadow-lg shadow-blue-500/50'
-              }`}
+              className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all `}
               title="Settings"
             >
               <SlidersIcon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -130,15 +120,7 @@ export default function Header({
             {/* Dashboard Button - Always visible */}
             <button
               onClick={() => setPage("dashboard")}
-              className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all border-2 ${
-                viewers.length === 0 
-                  ? 'border-transparent' 
-                  : viewers.length === 1
-                  ? 'border-green-300 shadow-sm shadow-green-300/30'
-                  : viewers.length <= 3
-                  ? 'border-green-400 shadow-md shadow-green-400/40'
-                  : 'border-green-500 shadow-lg shadow-green-500/50'
-              }`}
+              className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg p-2 transition-all`}
               title="Dashboard"
             >
               <ChartIcon className="h-5 w-5" />
