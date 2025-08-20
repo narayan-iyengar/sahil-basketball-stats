@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { db, auth, provider, rtdb } from "../firebase";
+import { db, auth, provider } from "../firebase";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 import { XIcon } from "lucide-react";
 

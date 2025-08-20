@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { db, provider, rtdb, auth } from "../firebase";
+import { db, provider, auth } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { XIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
