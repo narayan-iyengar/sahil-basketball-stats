@@ -16,11 +16,15 @@ export default function FilterDropdown({
 }) {
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside - but NOT on the filter button
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        onClose && onClose();
+        // Check if the click was on the filter button itself - if so, don't close
+        const filterButton = event.target.closest('[data-filter-button]');
+        if (!filterButton) {
+          onClose && onClose();
+        }
       }
     };
 
@@ -58,18 +62,23 @@ export default function FilterDropdown({
       dateFilter: '',
       outcomeFilter: ''
     });
+    // Close dropdown after clearing
+    setTimeout(() => onClose && onClose(), 100);
   };
 
-  // Handle filter changes
+  // Handle filter changes with smoother auto-close
   const handleFilterChange = (filterKey, value) => {
     const newFilters = { ...filters, [filterKey]: value };
     onFiltersChange(newFilters);
+    
+    // Smoother auto-close with longer delay for better UX
+    setTimeout(() => onClose && onClose(), 400);
   };
 
   return (
     <div 
       ref={dropdownRef}
-      className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
+      className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 transform transition-all duration-300 ease-out opacity-100 scale-100"
     >
       <div className="p-4 space-y-4">
         {/* Header */}
@@ -78,7 +87,7 @@ export default function FilterDropdown({
           {hasActiveFilters && (
             <button
               onClick={clearAllFilters}
-              className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-600"
+              className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-600 transition-colors"
             >
               <ClearIcon className="w-3 h-3" />
               Clear
@@ -94,7 +103,7 @@ export default function FilterDropdown({
           <select
             value={filters.searchTerm || ''}
             onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
-            className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none"
+            className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none transition-colors"
           >
             <option value="">All opponents</option>
             {uniqueOpponents.map((opponent, index) => (
@@ -113,7 +122,7 @@ export default function FilterDropdown({
           <select
             value={filters.dateFilter || ''}
             onChange={(e) => handleFilterChange('dateFilter', e.target.value)}
-            className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none"
+            className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none transition-colors"
           >
             <option value="">All dates</option>
             {uniqueDates.map((date, index) => (
@@ -132,7 +141,7 @@ export default function FilterDropdown({
           <select
             value={filters.outcomeFilter || ''}
             onChange={(e) => handleFilterChange('outcomeFilter', e.target.value)}
-            className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none"
+            className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none transition-colors"
           >
             <option value="">All games</option>
             <option value="W">Wins</option>

@@ -461,10 +461,8 @@ export default function Dashboard({
             </div>
           </div>
         </div>
-        </div>
 
         {/* Game History */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
           {/* Collapsible header - Centered */}
           <div 
@@ -488,24 +486,89 @@ export default function Dashboard({
           
           {isHistoryVisible && (
             <>
-              {/* Control buttons row - Aligned left */}
+              {/* Control buttons row - Multi-select on left, Filter on right */}
               <div className="flex items-center justify-between mb-4">
+                {/* Left side: Multi-select controls - Only show for admins */}
                 <div className="flex items-center gap-2">
-                  {/* Filter Button - Aligned with other controls */}
+                  {isUserAdmin && (
+                    <>
+                      <button
+                        onClick={toggleSelectionMode}
+                        className={`px-3 py-2 sm:px-2 sm:py-1 rounded text-sm sm:text-xs font-medium transition-colors flex items-center gap-2 sm:gap-1 min-h-[44px] sm:min-h-auto ${
+                          isSelectionMode 
+                            ? 'bg-orange-500 text-white' 
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                        title={isSelectionMode ? 'Cancel selection' : 'Select multiple games'}
+                      >
+                        {isSelectionMode ? <CancelIcon className="h-4 w-4 sm:h-3 sm:w-3" /> : <SelectIcon className="h-4 w-4 sm:h-3 sm:w-3" />}
+                        <span className="sm:hidden">{isSelectionMode ? 'Cancel' : 'Select'}</span>
+                        <span className="hidden sm:inline">{isSelectionMode ? 'Cancel' : 'Select'}</span>
+                      </button>
+                      
+                      {isSelectionMode && (
+                        <>
+                          <button
+                            onClick={selectAllGames}
+                            className="px-3 py-2 sm:px-2 sm:py-1 rounded text-sm sm:text-xs bg-blue-500 text-white hover:bg-blue-600 flex items-center gap-2 sm:gap-1 min-h-[44px] sm:min-h-auto"
+                            title="Select all games on this page"
+                          >
+                            <SelectAllIcon className="h-4 w-4 sm:h-3 sm:w-3" />
+                            <span className="sm:hidden">All</span>
+                            <span className="hidden sm:inline">All</span>
+                          </button>
+                          <button
+                            onClick={deselectAllGames}
+                            className="px-3 py-2 sm:px-2 sm:py-1 rounded text-sm sm:text-xs bg-gray-500 text-white hover:bg-gray-600 flex items-center gap-2 sm:gap-1 min-h-[44px] sm:min-h-auto"
+                            title="Clear selection"
+                          >
+                            <ClearIcon className="h-4 w-4 sm:h-3 sm:w-3" />
+                            <span className="sm:hidden">Clear</span>
+                            <span className="hidden sm:inline">Clear</span>
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+                
+                {/* Right side: Filter button and selection actions */}
+                <div className="flex items-center gap-2">
+                  {/* Selection count and bulk delete - Show when in selection mode */}
+                  {isUserAdmin && isSelectionMode && selectedGameIds.length > 0 && (
+                    <>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedGameIds.length} selected
+                      </span>
+                      <button
+                        onClick={handleBulkDelete}
+                        className="px-3 py-2 sm:px-2 sm:py-1 rounded text-sm sm:text-xs bg-red-500 text-white hover:bg-red-600 flex items-center gap-2 sm:gap-1 min-h-[44px] sm:min-h-auto"
+                        title="Delete selected games"
+                      >
+                        <TrashIcon className="h-4 w-4 sm:h-3 sm:w-3" />
+                        <span className="sm:hidden">Delete</span>
+                        <span className="hidden sm:inline">Delete</span>
+                      </button>
+                    </>
+                  )}
+                  
+                  {/* Filter Button - Toggle behavior with data attribute */}
                   <div className="relative">
                     <button
+                      data-filter-button="true"
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowFilterDropdown(!showFilterDropdown);
                       }}
-                      className={`px-2 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+                      className={`px-3 py-2 sm:px-2 sm:py-1 rounded text-sm sm:text-xs font-medium transition-colors flex items-center gap-2 sm:gap-1 min-h-[44px] sm:min-h-auto ${
                         (searchTerm || dateFilter || outcomeFilter)
                           ? 'bg-orange-500 text-white shadow-sm' 
                           : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                       title="Filter games"
                     >
-                      <FilterIcon className="h-3 w-3" />
+                      <FilterIcon className="h-4 w-4 sm:h-3 sm:w-3" />
+                      <span className="sm:hidden">Filter</span>
                       <span className="hidden sm:inline">Filter</span>
                     </button>
                     
@@ -527,63 +590,7 @@ export default function Dashboard({
                       />
                     )}
                   </div>
-
-                  {/* Multi-select controls - Only show for admins */}
-                  {isUserAdmin && (
-                    <>
-                      <button
-                        onClick={toggleSelectionMode}
-                        className={`px-2 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
-                          isSelectionMode 
-                            ? 'bg-orange-500 text-white' 
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                        }`}
-                        title={isSelectionMode ? 'Cancel selection' : 'Select multiple games'}
-                      >
-                        {isSelectionMode ? <CancelIcon className="h-3 w-3" /> : <SelectIcon className="h-3 w-3" />}
-                        <span className="hidden sm:inline">{isSelectionMode ? 'Cancel' : 'Select'}</span>
-                      </button>
-                      
-                      {isSelectionMode && (
-                        <>
-                          <button
-                            onClick={selectAllGames}
-                            className="px-2 py-1 rounded text-xs bg-blue-500 text-white hover:bg-blue-600 flex items-center gap-1"
-                            title="Select all games on this page"
-                          >
-                            <SelectAllIcon className="h-3 w-3" />
-                            <span className="hidden sm:inline">All</span>
-                          </button>
-                          <button
-                            onClick={deselectAllGames}
-                            className="px-2 py-1 rounded text-xs bg-gray-500 text-white hover:bg-gray-600 flex items-center gap-1"
-                            title="Clear selection"
-                          >
-                            <ClearIcon className="h-3 w-3" />
-                            <span className="hidden sm:inline">Clear</span>
-                          </button>
-                        </>
-                      )}
-                    </>
-                  )}
                 </div>
-                
-                {/* Selection count - Right side */}
-                {isUserAdmin && isSelectionMode && selectedGameIds.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedGameIds.length} selected
-                    </span>
-                    <button
-                      onClick={handleBulkDelete}
-                      className="px-2 py-1 rounded text-xs bg-red-500 text-white hover:bg-red-600 flex items-center gap-1"
-                      title="Delete selected games"
-                    >
-                      <TrashIcon className="h-3 w-3" />
-                      <span className="hidden sm:inline">Delete</span>
-                    </button>
-                  </div>
-                )}
               </div>
               
               <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-2">
