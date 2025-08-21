@@ -23,7 +23,7 @@ import {
   canManageLiveGames,
   getUserRole,
   showAccessDenied 
-} from "./components/adminUtils";
+} from "./utils/adminUtils";
 
 export default function App() {
   // Auth & User
@@ -45,6 +45,8 @@ export default function App() {
 
   // Settings Modal
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Remove dashboard filter state since it's now handled in Dashboard component
 
   // Game setup global settings
   const [globalGameFormat, setGlobalGameFormat] = useState(() => {
@@ -482,6 +484,9 @@ export default function App() {
           onDeleteAllLiveGames={handleDeleteAllLiveGames}
           openSettingsModal={openSettingsModal}
           isUserAdmin={isUserAdmin}
+          games={games}
+          dashboardFilters={dashboardFilters}
+          onDashboardFiltersChange={handleDashboardFiltersChange}
         />
         <main className="flex-1 flex items-center justify-center">
           <div className="max-w-md mx-auto text-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg">

@@ -29,8 +29,24 @@ export default function FilterDropdown({
   }, [onClose]);
 
   // Get unique values for filter options
-  const uniqueOpponents = [...new Set(games.map(game => game.opponent).filter(Boolean))].sort();
-  const uniqueDates = [...new Set(games.map(game => game.date).filter(Boolean))].sort().reverse(); // Most recent first
+  const uniqueOpponents = [...new Set(
+    games.map(game => game.opponent)
+         .filter(Boolean)
+  )].sort();
+  
+  const uniqueDates = [...new Set(
+    games.map(game => {
+      // Handle both timestamp and date fields
+      if (game.timestamp) {
+        return new Date(game.timestamp).toISOString().split('T')[0];
+      }
+      if (game.date) {
+        return game.date;
+      }
+      return null;
+    })
+    .filter(Boolean)
+  )].sort().reverse(); // Most recent first
 
   // Check if any filters are active
   const hasActiveFilters = filters.searchTerm || filters.dateFilter || filters.outcomeFilter;
@@ -42,13 +58,12 @@ export default function FilterDropdown({
       dateFilter: '',
       outcomeFilter: ''
     });
-    onClose && onClose(); // Close dropdown after clearing
   };
 
-  // Handle filter changes and close dropdown
-  const handleFilterChange = (newFilters) => {
+  // Handle filter changes
+  const handleFilterChange = (filterKey, value) => {
+    const newFilters = { ...filters, [filterKey]: value };
     onFiltersChange(newFilters);
-    onClose && onClose(); // Close dropdown after selecting filter
   };
 
   return (
@@ -78,7 +93,7 @@ export default function FilterDropdown({
           </label>
           <select
             value={filters.searchTerm || ''}
-            onChange={(e) => handleFilterChange({ ...filters, searchTerm: e.target.value })}
+            onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
             className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none"
           >
             <option value="">All opponents</option>
@@ -97,7 +112,7 @@ export default function FilterDropdown({
           </label>
           <select
             value={filters.dateFilter || ''}
-            onChange={(e) => handleFilterChange({ ...filters, dateFilter: e.target.value })}
+            onChange={(e) => handleFilterChange('dateFilter', e.target.value)}
             className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none"
           >
             <option value="">All dates</option>
@@ -116,7 +131,7 @@ export default function FilterDropdown({
           </label>
           <select
             value={filters.outcomeFilter || ''}
-            onChange={(e) => handleFilterChange({ ...filters, outcomeFilter: e.target.value })}
+            onChange={(e) => handleFilterChange('outcomeFilter', e.target.value)}
             className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded p-2 text-sm focus:ring-orange-500 focus:ring-1 outline-none"
           >
             <option value="">All games</option>

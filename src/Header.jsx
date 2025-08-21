@@ -27,13 +27,8 @@ export default function Header({
   goToLiveGame,
   openSettingsModal,
   onSignIn,
-  isUserAdmin = false, // NEW: Admin status prop
-  // Filter props
-  games = [],
-  dashboardFilters = {},
-  onDashboardFiltersChange,
+  isUserAdmin = false,
 }) {
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const hasLive = !!liveGameId;
 
   // Determine header background color based on user role - SIMPLIFIED
@@ -79,14 +74,7 @@ export default function Header({
   );
 
   // Check if any filters are active
-  const hasActiveFilters = dashboardFilters.searchTerm || dashboardFilters.dateFilter || dashboardFilters.outcomeFilter;
-
-  // Handle filter changes
-  const handleFiltersChange = (newFilters) => {
-    if (onDashboardFiltersChange) {
-      onDashboardFiltersChange(newFilters);
-    }
-  };
+  const hasActiveFilters = false; // Removed filter logic from header
 
   // Settings button click handler
   const handleSettingsClick = () => {
@@ -131,7 +119,7 @@ export default function Header({
             {LiveIndicator}
           </div>
 
-          {/* Right: Controls - Settings, Dashboard, Filter, Sign Out/In */}
+          {/* Right: Controls - Settings, Dashboard, Sign Out/In */}
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Settings Button - Disabled for non-admins */}
             <button
@@ -155,44 +143,6 @@ export default function Header({
             >
               <ChartIcon className="h-5 w-5" />
             </button>
-
-            {/* Filter Button - Always visible, functional only on Dashboard */}
-            {user && (
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    if (page === "dashboard") {
-                      setShowFilterDropdown(!showFilterDropdown);
-                    }
-                  }}
-                  className={`flex items-center justify-center rounded-lg p-2 transition-all border-2 ${
-                    page === "dashboard"
-                      ? `bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 cursor-pointer ${
-                          hasActiveFilters 
-                            ? 'border-orange-300 shadow-sm shadow-orange-300/30' 
-                            : 'border-transparent'
-                        }`
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed border-transparent'
-                  }`}
-                  title={page === "dashboard" ? "Filter games" : "Filter only available on Dashboard"}
-                  disabled={page !== "dashboard"}
-                >
-                  <FilterIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {hasActiveFilters && page === "dashboard" && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full"></span>
-                  )}
-                </button>
-                
-                {showFilterDropdown && page === "dashboard" && (
-                  <FilterDropdown 
-                    games={games}
-                    filters={dashboardFilters}
-                    onFiltersChange={handleFiltersChange}
-                    onClose={() => setShowFilterDropdown(false)}
-                  />
-                )}
-              </div>
-            )}
 
             {/* Sign Out/Sign In Button - FIXED: Check for actual Google auth */}
             {user && !user.isAnonymous ? (

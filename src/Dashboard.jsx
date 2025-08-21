@@ -1,11 +1,37 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import StatGraphModal from "./StatGraphModal";
-import { PlusIcon, TrashIcon, ChevronRightIcon } from "./icons";
+import { PlusIcon, TrashIcon, ChevronRightIcon, FilterIcon } from "./icons";
 import { getEarnedBadges, BadgeSummary, BadgeDisplay } from "./achievement_system";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
+import FilterDropdown from "./FilterDropdown";
 
 // Import admin utilities
-import { canDelete, canWrite, showAccessDenied } from "./components/adminUtils";
+import { canDelete, canWrite, showAccessDenied } from "./utils/adminUtils";
+
+// Additional icons for mobile-friendly buttons
+const SelectIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const CancelIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6m0 12L6 6" />
+  </svg>
+);
+
+const SelectAllIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+  </svg>
+);
+
+const ClearIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
 
 // Subtle checkmark icon
 const CheckIcon = ({ className = "" }) => (
@@ -65,15 +91,18 @@ export default function Dashboard({
   onDeleteGame,
   onUpdateGamePhotos, 
   externalFilters = {},
-  isUserAdmin = false, // NEW: Admin status prop
+  isUserAdmin = false,
 }) {
   const [newTeamName, setNewTeamName] = useState("");
   const [graphData, setGraphData] = useState(null);
   
-  // Use external filters if provided, otherwise use local state
-  const [searchTerm, setSearchTerm] = useState(externalFilters.searchTerm || "");
-  const [dateFilter, setDateFilter] = useState(externalFilters.dateFilter || "");
-  const [outcomeFilter, setOutcomeFilter] = useState(externalFilters.outcomeFilter || ""); 
+  // Local filter state (no longer using external filters)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [outcomeFilter, setOutcomeFilter] = useState(""); 
+  
+  // Filter dropdown state
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   
   const [expandedGameIds, setExpandedGameIds] = useState([]);
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
@@ -89,13 +118,8 @@ export default function Dashboard({
   
   const GAMES_PER_PAGE = 4;
 
-  // Update local filters when external filters change
-  useEffect(() => {
-    setSearchTerm(externalFilters.searchTerm || "");
-    setDateFilter(externalFilters.dateFilter || "");
-    setOutcomeFilter(externalFilters.outcomeFilter || "");
-    setCurrentPage(1);
-  }, [externalFilters]);
+  // Remove external filter sync since we're now handling filters locally
+  // (removed useEffect for externalFilters)
 
   // Unique opponent suggestions
   const allOpponents = useMemo(() => {
@@ -148,24 +172,37 @@ export default function Dashboard({
   // Filters and pagination
   const sortedAndFilteredStats = useMemo(() => {
     let sortableItems = [...(stats || [])];
+    
     if (searchTerm) {
-      sortableItems = sortableItems.filter((game) =>
-        (game.opponent || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())
-      );
+      sortableItems = sortableItems.filter((game) => {
+        const opponent = game.opponent || "";
+        return opponent.toLowerCase().includes(searchTerm.toLowerCase());
+      });
     }
+    
     if (dateFilter) {
-      sortableItems = sortableItems.filter((game) => game.date === dateFilter);
+      sortableItems = sortableItems.filter((game) => {
+        // Handle both timestamp and date formats
+        let gameDate = "";
+        if (game.timestamp) {
+          gameDate = new Date(game.timestamp).toISOString().split('T')[0];
+        } else if (game.date) {
+          gameDate = game.date;
+        }
+        return gameDate === dateFilter;
+      });
     }
+    
     if (outcomeFilter) {
       sortableItems = sortableItems.filter((game) => game.outcome === outcomeFilter);
     }
+    
     sortableItems.sort((a, b) => {
       if (a.timestamp < b.timestamp) return 1;
       if (a.timestamp > b.timestamp) return -1;
       return 0;
     });
+    
     return sortableItems;
   }, [stats, searchTerm, dateFilter, outcomeFilter]);
 
@@ -337,7 +374,7 @@ export default function Dashboard({
   };
 
   return (
-    <>
+    <div>
       {graphData && (
         <StatGraphModal graphData={graphData} onClose={() => setGraphData(null)} />
       )}
@@ -424,10 +461,13 @@ export default function Dashboard({
             </div>
           </div>
         </div>
+        </div>
 
         {/* Game History */}
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-          <div
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          {/* Collapsible header - Centered */}
+          <div 
             className="flex flex-col items-center mb-4 cursor-pointer p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             onClick={() => setIsHistoryVisible(!isHistoryVisible)}
           >
@@ -435,76 +475,116 @@ export default function Dashboard({
             <h2 className="text-2xl font-bold text-orange-500 mt-2">
               Game History
             </h2>
+            {/* Filter status below title */}
+            {(searchTerm || dateFilter || outcomeFilter) && (
+              <div className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                Showing {sortedAndFilteredStats.length} of {(stats || []).length} games
+                {searchTerm && <span className="block text-xs">• Opponent: {searchTerm}</span>}
+                {dateFilter && <span className="block text-xs">• Date: {new Date(dateFilter).toLocaleDateString()}</span>}
+                {outcomeFilter && <span className="block text-xs">• Result: {outcomeFilter === 'W' ? 'Wins' : outcomeFilter === 'L' ? 'Losses' : 'Ties'}</span>}
+              </div>
+            )}
           </div>
           
           {isHistoryVisible && (
             <>
-              {/* Show filter status when filters come from header */}
-              {(externalFilters.searchTerm || externalFilters.dateFilter || externalFilters.outcomeFilter) && (
-                <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                  <div className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-1">
-                    Active Filters:
-                  </div>
-                  <div className="text-xs text-orange-700 dark:text-orange-300">
-                    {externalFilters.searchTerm && <span className="block">• Opponent: {externalFilters.searchTerm}</span>}
-                    {externalFilters.dateFilter && <span className="block">• Date: {new Date(externalFilters.dateFilter).toLocaleDateString()}</span>}
-                    {externalFilters.outcomeFilter && <span className="block">• Result: {externalFilters.outcomeFilter === 'W' ? 'Wins' : externalFilters.outcomeFilter === 'L' ? 'Losses' : 'Ties'}</span>}
-                  </div>
-                  <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                    Use the filter button in the header to modify filters
-                  </div>
-                </div>
-              )}
-
-              {/* Multi-select controls - Only show for admins */}
-              {isUserAdmin && (
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
+              {/* Control buttons row - Aligned left */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  {/* Filter Button - Aligned with other controls */}
+                  <div className="relative">
                     <button
-                      onClick={toggleSelectionMode}
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                        isSelectionMode 
-                          ? 'bg-orange-500 text-white' 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowFilterDropdown(!showFilterDropdown);
+                      }}
+                      className={`px-2 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+                        (searchTerm || dateFilter || outcomeFilter)
+                          ? 'bg-orange-500 text-white shadow-sm' 
                           : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
+                      title="Filter games"
                     >
-                      {isSelectionMode ? 'Cancel' : 'Select'}
+                      <FilterIcon className="h-3 w-3" />
+                      <span className="hidden sm:inline">Filter</span>
                     </button>
                     
-                    {isSelectionMode && (
-                      <>
-                        <button
-                          onClick={selectAllGames}
-                          className="px-2 py-1 rounded text-xs bg-blue-500 text-white hover:bg-blue-600"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          onClick={deselectAllGames}
-                          className="px-2 py-1 rounded text-xs bg-gray-500 text-white hover:bg-gray-600"
-                        >
-                          Clear
-                        </button>
-                      </>
+                    {showFilterDropdown && (
+                      <FilterDropdown 
+                        games={stats}
+                        filters={{
+                          searchTerm,
+                          dateFilter,
+                          outcomeFilter
+                        }}
+                        onFiltersChange={(newFilters) => {
+                          setSearchTerm(newFilters.searchTerm || "");
+                          setDateFilter(newFilters.dateFilter || "");
+                          setOutcomeFilter(newFilters.outcomeFilter || "");
+                          setCurrentPage(1);
+                        }}
+                        onClose={() => setShowFilterDropdown(false)}
+                      />
                     )}
                   </div>
-                  
-                  {isSelectionMode && selectedGameIds.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {selectedGameIds.length} selected
-                      </span>
+
+                  {/* Multi-select controls - Only show for admins */}
+                  {isUserAdmin && (
+                    <>
                       <button
-                        onClick={handleBulkDelete}
-                        className="px-3 py-1 rounded text-sm bg-red-500 text-white hover:bg-red-600 flex items-center gap-1"
+                        onClick={toggleSelectionMode}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+                          isSelectionMode 
+                            ? 'bg-orange-500 text-white' 
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                        title={isSelectionMode ? 'Cancel selection' : 'Select multiple games'}
                       >
-                        <TrashIcon />
-                        Delete Selected
+                        {isSelectionMode ? <CancelIcon className="h-3 w-3" /> : <SelectIcon className="h-3 w-3" />}
+                        <span className="hidden sm:inline">{isSelectionMode ? 'Cancel' : 'Select'}</span>
                       </button>
-                    </div>
+                      
+                      {isSelectionMode && (
+                        <>
+                          <button
+                            onClick={selectAllGames}
+                            className="px-2 py-1 rounded text-xs bg-blue-500 text-white hover:bg-blue-600 flex items-center gap-1"
+                            title="Select all games on this page"
+                          >
+                            <SelectAllIcon className="h-3 w-3" />
+                            <span className="hidden sm:inline">All</span>
+                          </button>
+                          <button
+                            onClick={deselectAllGames}
+                            className="px-2 py-1 rounded text-xs bg-gray-500 text-white hover:bg-gray-600 flex items-center gap-1"
+                            title="Clear selection"
+                          >
+                            <ClearIcon className="h-3 w-3" />
+                            <span className="hidden sm:inline">Clear</span>
+                          </button>
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
-              )}
+                
+                {/* Selection count - Right side */}
+                {isUserAdmin && isSelectionMode && selectedGameIds.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {selectedGameIds.length} selected
+                    </span>
+                    <button
+                      onClick={handleBulkDelete}
+                      className="px-2 py-1 rounded text-xs bg-red-500 text-white hover:bg-red-600 flex items-center gap-1"
+                      title="Delete selected games"
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
+                  </div>
+                )}
+              </div>
               
               <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-2">
                 {paginatedStats.length > 0 ? (
@@ -780,6 +860,6 @@ export default function Dashboard({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
