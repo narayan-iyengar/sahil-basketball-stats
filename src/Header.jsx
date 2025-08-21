@@ -145,7 +145,7 @@ export default function Header({
           </div>
 
           {/* Right: Controls - Settings, Dashboard, Sign Out/In */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-2">
             {/* Settings Button - Option 4 styling */}
             <button
               onClick={handleSettingsClick}
@@ -157,7 +157,7 @@ export default function Header({
               }`}
               title={isUserAdmin ? "Settings" : "Settings (Admin Only)"}
             >
-              <SlidersIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+              <SlidersIcon className="h-5 w-5 sm:h-5 sm:w-5" />
             </button>
 
             {/* Dashboard Button - Matching gradient colors for admin */}
