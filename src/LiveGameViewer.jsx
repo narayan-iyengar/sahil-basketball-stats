@@ -138,17 +138,21 @@ export default function LiveGameViewer({ db, gameId, user }) {
             <h3 className="text-xl md:text-2xl font-bold truncate">{game.teamName}</h3>
             <p className="text-5xl md:text-7xl font-mono">{game.homeScore}</p>
           </div>
-          <div className="w-1/3">
-            <p className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
-              clockIsUrgent 
-                ? 'text-red-500 animate-pulse scale-110 font-bold' 
-                : clockIsRed 
-                  ? 'text-red-500 animate-pulse' 
-                  : ''
-            }`}>
-              {formatTime(displayClock, displayClockTenths)}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{periodName} {game.period}</p>
+<div className="w-1/3">
+            <div className="flex flex-col items-center">
+              <p className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
+                clockIsUrgent 
+                  ? 'text-red-500 animate-pulse scale-110 font-bold' 
+                  : clockIsRed 
+                    ? 'text-red-500 animate-pulse' 
+                    : ''
+              }`}>
+                {formatTime(displayClock, displayClockTenths)}
+              </p>
+              <p className="text-base font-medium text-gray-700 dark:text-gray-300 mt-1 capitalize">
+                {periodName} {game.period}
+              </p>
+            </div>
           </div>
           <div className="w-1/3">
             <h3 className="text-xl md:text-2xl font-bold truncate">{game.opponent}</h3>

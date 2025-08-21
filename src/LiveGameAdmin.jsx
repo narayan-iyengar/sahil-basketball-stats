@@ -320,7 +320,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
         <div className="w-full max-w-md mx-auto p-4">
           <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 relative">
             <div className="absolute top-2 right-2"><SaveStatusIndicator status={saveStatus} /></div>
-            {/* Clock Section - Centered */}
+{/* Clock Section - Centered with better period/half label */}
             <div className="flex justify-center items-center text-center mb-4">
               <div className="flex flex-col items-center justify-center">
                 <span className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
@@ -332,7 +332,9 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
                 }`}>
                   {formatTime(displayClock, displayClockTenths)}
                 </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400 capitalize">{periodName} {game.period}</span>
+                <span className="text-base font-medium text-gray-700 dark:text-gray-300 mt-1 capitalize">
+                  {periodName} {game.period}
+                </span>
               </div>
             </div>
 

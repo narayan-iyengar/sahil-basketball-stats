@@ -63,19 +63,29 @@ export default function SettingsModal({
     setTimeout(() => setSaveStatus(""), 1200);
   };
 
-  // Game format/length changes with persistence
-  const handleGameFormatChange = (format) => {
-    setGameFormat(format);
-    localStorage.setItem("gameFormat", format);
-    setSaveStatus("success");
+  // Game format/length changes with Firebase persistence
+  const handleGameFormatChange = async (format) => {
+    setSaveStatus("saving");
+    try {
+      await setGameFormat(format); // This now calls updateGameSettings in App.jsx
+      setSaveStatus("success");
+    } catch (error) {
+      console.error("Error updating game format:", error);
+      setSaveStatus("error");
+    }
     setTimeout(() => setSaveStatus(""), 1200);
   };
 
-  const handlePeriodLengthChange = (val) => {
+  const handlePeriodLengthChange = async (val) => {
     const length = Number(val);
-    setPeriodLength(length);
-    localStorage.setItem("periodLength", length.toString());
-    setSaveStatus("success");
+    setSaveStatus("saving");
+    try {
+      await setPeriodLength(length); // This now calls updateGameSettings in App.jsx
+      setSaveStatus("success");
+    } catch (error) {
+      console.error("Error updating period length:", error);
+      setSaveStatus("error");
+    }
     setTimeout(() => setSaveStatus(""), 1200);
   };
 
@@ -118,6 +128,16 @@ export default function SettingsModal({
           <SaveStatusIndicator status={saveStatus} />
         </h2>
 
+        {/* Cross-Device Sync Notice */}
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="text-sm text-blue-800 dark:text-blue-200">
+            <div className="font-medium mb-1">☁️ Cross-Device Sync</div>
+            <div className="text-xs text-blue-700 dark:text-blue-300">
+              Game format and period length are now synced across all your devices automatically.
+            </div>
+          </div>
+        </div>
+
         {/* Teams */}
         <div className="mb-6">
           <h3 className="font-semibold mb-2">Teams</h3>
@@ -158,7 +178,7 @@ export default function SettingsModal({
           </ul>
         </div>
 
-        {/* Game Format */}
+        {/* Game Format - Now with Firebase sync */}
         <div className="mb-6">
           <h3 className="font-semibold mb-2">Game Format</h3>
           <div className="flex gap-4 items-center mb-2">

@@ -33,21 +33,16 @@ export default function Header({
 }) {
   const hasLive = !!liveGameId;
 
-  // Option 4: Subtle Glow Effect styling
+  // Clean header that blends seamlessly
   const getHeaderBgColor = () => {
     if (isUserAdmin) {
-      return "bg-white dark:bg-gray-800 border-b border-orange-200 dark:border-orange-700/50"; 
+      return "bg-gray-100 dark:bg-gray-900"; // Match the main app background
     }
     return "bg-slate-50/80 dark:bg-slate-800/80"; 
   };
 
-  // Option 4: Subtle glow effect
+  // Remove admin glow effect
   const getContainerStyles = () => {
-    if (isUserAdmin) {
-      return {
-        boxShadow: '0 0 20px rgba(245, 158, 11, 0.3), 0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-      };
-    }
     return {};
   };
 
@@ -145,7 +140,7 @@ export default function Header({
           </div>
 
           {/* Right: Controls - Settings, Dashboard, Sign Out/In */}
-          <div className="flex items-center gap-2 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* Settings Button - Option 4 styling */}
             <button
               onClick={handleSettingsClick}

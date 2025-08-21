@@ -25,6 +25,9 @@ import {
   showAccessDenied 
 } from "./utils/adminUtils";
 
+// Import the new settings utilities
+import { getUserSettings, updateUserSettings, initializeUserSettings } from "./utils/settingsUtils";
+
 export default function App() {
   // Auth & User
   const [user, setUser] = useState(null);
@@ -46,26 +49,80 @@ export default function App() {
   // Settings Modal
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Remove dashboard filter state since it's now handled in Dashboard component
-
-  // Game setup global settings
-  const [globalGameFormat, setGlobalGameFormat] = useState(() => {
-    return localStorage.getItem("gameFormat") || "halves";
-  });
-  const [globalPeriodLength, setGlobalPeriodLength] = useState(() => {
-    return parseInt(localStorage.getItem("periodLength")) || 20;
-  });
+  // Game setup settings - now managed by Firebase for admins
+  const [globalGameFormat, setGlobalGameFormat] = useState("halves");
+  const [globalPeriodLength, setGlobalPeriodLength] = useState(20);
   const [globalNumPeriods, setGlobalNumPeriods] = useState(2);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
-  // --- AUTH LOGIC ---
+  // --- AUTH LOGIC WITH SETTINGS LOADING ---
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setIsUserAdmin(isAdmin(u));
+      
+      // Load user settings when user changes
+      if (u && isAdmin(u)) {
+        try {
+          const settings = await getUserSettings(u);
+          setGlobalGameFormat(settings.gameFormat);
+          setGlobalPeriodLength(settings.periodLength);
+          setGlobalNumPeriods(settings.gameFormat === "halves" ? 2 : 4);
+          console.log("Loaded admin settings from Firebase:", settings);
+        } catch (error) {
+          console.error("Error loading user settings:", error);
+          // Fallback to localStorage values
+          setGlobalGameFormat(localStorage.getItem("gameFormat") || "halves");
+          setGlobalPeriodLength(parseInt(localStorage.getItem("periodLength")) || 20);
+          setGlobalNumPeriods(2);
+        }
+      } else {
+        // Non-admin users: use localStorage defaults
+        setGlobalGameFormat(localStorage.getItem("gameFormat") || "halves");
+        setGlobalPeriodLength(parseInt(localStorage.getItem("periodLength")) || 20);
+        setGlobalNumPeriods(2);
+      }
+      
+      setSettingsLoaded(true);
       setLoading(false);
     });
     return unsub;
   }, []);
+
+  // Update Firebase settings when admin changes them
+  const updateGameSettings = useCallback(async (newSettings) => {
+    if (!isUserAdmin || !user) {
+      // Non-admin users: only update localStorage
+      if (newSettings.gameFormat) {
+        localStorage.setItem("gameFormat", newSettings.gameFormat);
+        setGlobalGameFormat(newSettings.gameFormat);
+        setGlobalNumPeriods(newSettings.gameFormat === "halves" ? 2 : 4);
+      }
+      if (newSettings.periodLength) {
+        localStorage.setItem("periodLength", newSettings.periodLength.toString());
+        setGlobalPeriodLength(newSettings.periodLength);
+      }
+      return;
+    }
+
+    try {
+      await updateUserSettings(user, newSettings);
+      
+      // Update local state
+      if (newSettings.gameFormat) {
+        setGlobalGameFormat(newSettings.gameFormat);
+        setGlobalNumPeriods(newSettings.gameFormat === "halves" ? 2 : 4);
+      }
+      if (newSettings.periodLength) {
+        setGlobalPeriodLength(newSettings.periodLength);
+      }
+      
+      console.log("Settings updated successfully across devices");
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      alert("Failed to save settings. Please try again.");
+    }
+  }, [user, isUserAdmin]);
 
   // --- THEME LOGIC ---
   useEffect(() => {
@@ -393,7 +450,7 @@ export default function App() {
   };
 
   // --- PAGE RENDER LOGIC ---
-  if (loading || liveGameLoading) {
+  if (loading || liveGameLoading || !settingsLoaded) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
         <span className="text-orange-500 font-bold text-3xl animate-spin-slow">🏀</span>
@@ -484,9 +541,6 @@ export default function App() {
           onDeleteAllLiveGames={handleDeleteAllLiveGames}
           openSettingsModal={openSettingsModal}
           isUserAdmin={isUserAdmin}
-          games={games}
-          dashboardFilters={dashboardFilters}
-          onDashboardFiltersChange={handleDashboardFiltersChange}
         />
         <main className="flex-1 flex items-center justify-center">
           <div className="max-w-md mx-auto text-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
@@ -534,9 +588,9 @@ export default function App() {
         onAddTeam={handleAddTeam}
         onDeleteTeam={handleDeleteTeam}
         gameFormat={globalGameFormat}
-        setGameFormat={setGlobalGameFormat}
+        setGameFormat={(format) => updateGameSettings({ gameFormat: format })}
         periodLength={globalPeriodLength}
-        setPeriodLength={setGlobalPeriodLength}
+        setPeriodLength={(length) => updateGameSettings({ periodLength: length })}
         theme={theme}
         toggleTheme={toggleTheme}
         setPage={setPage}
