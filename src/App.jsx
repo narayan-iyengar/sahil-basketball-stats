@@ -271,11 +271,44 @@ export default function App() {
       showAccessDenied('delete games');
       return;
     }
-    
     await deleteDoc(doc(db, "games", gameId));
     setGames((g) => g.filter((x) => x.id !== gameId));
     setStats((s) => s.filter((x) => x.gameId !== gameId));
   }, [user]);
+
+const handleUpdateGame = useCallback(async (gameId, updates) => {
+  if (!canWrite(user)) {
+    showAccessDenied('update games');
+    return;
+  }
+  
+  try {
+    // Calculate outcome if score is being updated
+    if (updates.myTeamScore !== undefined && updates.opponentScore !== undefined) {
+      let outcome = "T";
+      if (updates.myTeamScore > updates.opponentScore) outcome = "W";
+      else if (updates.myTeamScore < updates.opponentScore) outcome = "L";
+      updates.outcome = outcome;
+    }
+    
+    // Add edited flag and timestamp
+    updates.editedAt = new Date().toISOString();
+    updates.editedBy = user?.displayName ? user.displayName.split(" ")[0] : "";
+    
+    await updateDoc(doc(db, "games", gameId), updates);
+    
+    // Update local state
+    setGames((games) => 
+      games.map((game) => 
+        game.id === gameId ? { ...game, ...updates } : game
+      )
+    );
+    
+  } catch (error) {
+    console.error("Error updating game:", error);
+    throw error;
+  }
+}, [user]);
 
   // --- END GAME LOGIC ---
   const handleEndGame = async (liveGameId) => {
@@ -616,18 +649,20 @@ export default function App() {
         )}
         
         {user && page === "dashboard" && (
-          <Dashboard
-            user={user}
-            teams={teams}
-            games={games}
-            stats={games}
-            onDeleteGame={handleDeleteGame}
-            onDeleteTeam={handleDeleteTeam}
-            onAddTeam={handleAddTeam}
-            onUpdateGamePhotos={handleUpdateGamePhotos}
-            isUserAdmin={isUserAdmin}
-          />
+ <Dashboard
+   user={user}
+   teams={teams}
+   games={games}
+   stats={games}
+   onDeleteGame={handleDeleteGame}
+   onDeleteTeam={handleDeleteTeam}
+   onAddTeam={handleAddTeam}
+   onUpdateGamePhotos={handleUpdateGamePhotos}
+   onUpdateGame={handleUpdateGame}
+   isUserAdmin={isUserAdmin}
+ />
         )}
+        
         
         {user && isUserAdmin && page === "add_stat" && currentGameConfig && (
           <StatEntry

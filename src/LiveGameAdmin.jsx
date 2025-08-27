@@ -443,7 +443,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
         </div>
       </div>
 
-      {/* Fixed Bottom Controls - Always visible */}
+      {/* Fixed Bottom Controls - Enhanced styling */}
       <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-50">
         <div className="w-full max-w-md mx-auto p-3">
           <div className="grid grid-cols-3 gap-3">
@@ -457,9 +457,20 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
             >
               {game.isRunning ? "Pause" : "Start"}
             </button>
+            
+            {/* Enhanced Next/End Game button with glow effects */}
             <button 
               onClick={handleManualAdvance} 
-              className={`w-full font-bold py-3 rounded-lg text-lg ${gameEnded ? "bg-red-600 hover:bg-red-700" : "bg-orange-500 hover:bg-orange-600"} text-white`}
+              className={`w-full font-bold py-3 rounded-lg text-lg text-white transition-all duration-300 transform hover:scale-105 ${
+                atFinalPeriod 
+                  ? 'bg-red-600 hover:bg-red-700 shadow-red-500/50 shadow-lg hover:shadow-red-500/70 hover:shadow-xl animate-pulse' 
+                  : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/50 shadow-lg hover:shadow-orange-500/70 hover:shadow-xl'
+              }`}
+              style={{
+                boxShadow: atFinalPeriod 
+                  ? '0 0 20px rgba(239, 68, 68, 0.4), 0 0 40px rgba(239, 68, 68, 0.2)' 
+                  : '0 0 20px rgba(249, 115, 22, 0.4), 0 0 40px rgba(249, 115, 22, 0.2)'
+              }}
             >
               {endButtonLabel}
             </button>

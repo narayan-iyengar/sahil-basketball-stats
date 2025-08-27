@@ -1,9 +1,27 @@
 import React, { useState, useEffect, useMemo } from "react";
 
+// Location icon
+const LocationIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+
+// GPS icon
+const GPSIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="6" />
+    <circle cx="12" cy="12" r="2" />
+  </svg>
+);
+
 export default function GameSetup({ teams = [], stats = [], onSubmit }) {
   const [config, setConfig] = useState({
     teamName: "",
     opponent: "",
+    location: "",
     gameFormat: localStorage.getItem("gameFormat") || "periods",
     periodLength: parseInt(localStorage.getItem("periodLength")) || 10,
     numPeriods: 4,
@@ -15,6 +33,8 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
     }),
   });
   const [error, setError] = useState("");
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  
   const uniqueTeams = useMemo(() => {
     // De-dupe by id and name (just in case)
     const map = new Map();
@@ -31,6 +51,12 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
     return [...opponentSet];
   }, [stats]);
 
+  // Get unique locations from previous games for suggestions
+  const uniqueLocations = useMemo(() => {
+    const locationSet = new Set(stats.map((s) => s.location).filter(Boolean));
+    return [...locationSet].sort();
+  }, [stats]);
+
   useEffect(() => {
     if (uniqueTeams.length > 0 && !config.teamName) {
       setConfig((prev) => ({ ...prev, teamName: uniqueTeams[0].name }));
@@ -40,6 +66,55 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
   const handleOpponentChange = (e) => {
     const value = e.target.value;
     setConfig((prev) => ({ ...prev, opponent: value }));
+  };
+
+  const handleLocationChange = (e) => {
+    const value = e.target.value;
+    setConfig((prev) => ({ ...prev, location: value }));
+  };
+
+  // Auto-detect location using geolocation
+  const getAutoLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          
+          // Try to get a readable location name using reverse geocoding
+          const response = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+          );
+          const data = await response.json();
+          
+          // Use various fallbacks for location name
+          const locationName = data.locality || data.city || data.principalSubdivision || 
+                              `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+          
+          setConfig((prev) => ({ ...prev, location: locationName }));
+          setIsGettingLocation(false);
+        } catch (error) {
+          console.error("Error getting location name:", error);
+          // Fallback to coordinates
+          setConfig((prev) => ({ 
+            ...prev, 
+            location: `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}` 
+          }));
+          setIsGettingLocation(false);
+        }
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        alert("Unable to get your location. Please enter manually.");
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    );
   };
 
   // Check if current opponent exists in database
@@ -54,6 +129,14 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
       opp.toLowerCase().includes(config.opponent.toLowerCase()) &&
       opp.toLowerCase() !== config.opponent.toLowerCase()
   );
+
+  // Find location suggestions
+  const suggestedLocations = uniqueLocations.filter(
+    (loc) => 
+      config.location.length >= 2 && 
+      loc.toLowerCase().includes(config.location.toLowerCase()) &&
+      loc.toLowerCase() !== config.location.toLowerCase()
+  ).slice(0, 3);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -78,7 +161,7 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
 
   return (
     <div className="max-w-xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-      {/* Header with centered date/time - FIXED: Remove duplicate icons */}
+      {/* Header with centered date/time */}
       <div className="flex items-center justify-center mb-6">
         <div className="flex items-center gap-2">
           <input
@@ -174,6 +257,70 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
                   New opponent
                 </div>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Location Field */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <LocationIcon className="inline w-4 h-4 mr-1" />
+            Location
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              name="location"
+              placeholder="e.g., Oakland Rec Center, Home Court"
+              value={config.location}
+              onChange={handleLocationChange}
+              className="flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
+            />
+            <button
+              type="button"
+              onClick={getAutoLocation}
+              disabled={isGettingLocation}
+              className="px-3 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center justify-center"
+              title="Auto-detect location"
+            >
+              {isGettingLocation ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <GPSIcon className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+          
+          {/* Location suggestions */}
+          {suggestedLocations.length > 0 && (
+            <div className="mt-2 text-sm">
+              <div className="text-gray-600 dark:text-gray-400 mb-1">Previous locations:</div>
+              <div className="flex flex-wrap gap-1">
+                {suggestedLocations.map((location) => (
+                  <button
+                    key={location}
+                    type="button"
+                    onClick={() => setConfig(prev => ({ ...prev, location }))}
+                    className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    {location}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {config.location && !uniqueLocations.includes(config.location) && (
+            <div className="mt-2 text-sm">
+              <div className="flex items-center text-gray-500 dark:text-gray-400">
+                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+                New location
+              </div>
             </div>
           )}
         </div>

@@ -8,16 +8,39 @@ import FilterDropdown from "./FilterDropdown";
 // Import admin utilities
 import { canDelete, canWrite, showAccessDenied } from "./utils/adminUtils";
 
+// Edit icon
+const EditIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
+
+// Save icon
+const SaveIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+  </svg>
+);
+
+// Cancel icon
+const CancelIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6m0 12L6 6" />
+  </svg>
+);
+
+// Location icon
+const LocationIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+
 // Additional icons for mobile-friendly buttons
 const SelectIcon = ({ className = "" }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const CancelIcon = ({ className = "" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6m0 12L6 6" />
   </svg>
 );
 
@@ -45,16 +68,78 @@ const ExpandableBar = ({ isExpanded, className = "" }) => (
   <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
 );
 
-// Card for stat values
-const StatCard = ({ label, value, onClick, clickable }) => (
+// Card for stat values - now with editing capability
+const StatCard = ({ label, value, onClick, clickable, onEdit, editable, isEditing, editValue, onEditChange, onSave, onCancel, gameId }) => (
   <div
     className={`bg-gray-100 dark:bg-gray-700 flex flex-col rounded-lg p-2 items-center min-w-[70px] transition cursor-pointer ${
       clickable ? "hover:shadow-lg hover:bg-orange-50 dark:hover:bg-orange-900" : ""
-    }`}
+    } ${isEditing ? "bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-600" : ""}`}
     onClick={clickable ? onClick : undefined}
   >
-    <span className="text-xs text-orange-500 mb-1">{label}</span>
-    <span className="text-2xl font-bold text-black dark:text-white">{value}</span>
+    <div className="flex items-center gap-1 mb-1">
+      <span className="text-xs text-orange-500">{label}</span>
+      {editable && !isEditing && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className="p-0.5 text-gray-400 hover:text-blue-500 transition"
+          title={`Edit ${label}`}
+        >
+          <EditIcon className="w-2 h-2" />
+        </button>
+      )}
+    </div>
+    
+    {isEditing ? (
+      <div className="flex flex-col items-center gap-1 w-full">
+        <input
+          type="number"
+          value={editValue === 0 ? '' : editValue}
+          onChange={(e) => onEditChange(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+          className="w-full text-center text-sm px-1 py-0.5 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          placeholder="0"
+          onClick={(e) => e.stopPropagation()}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.stopPropagation();
+              onSave();
+            }
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              onCancel();
+            }
+          }}
+          autoFocus
+        />
+        <div className="flex gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSave();
+            }}
+            className="p-0.5 text-green-500 hover:text-green-600 bg-green-50 dark:bg-green-900/20 rounded"
+            title="Save"
+          >
+            <SaveIcon className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancel();
+            }}
+            className="p-0.5 text-gray-500 hover:text-gray-600 bg-gray-50 dark:bg-gray-700 rounded"
+            title="Cancel"
+          >
+            <CancelIcon className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    ) : (
+      <span className="text-2xl font-bold text-black dark:text-white">{value}</span>
+    )}
   </div>
 );
 
@@ -88,15 +173,17 @@ function groupGamesByAge(games) {
 export default function Dashboard({
   user,
   stats = [],
+  teams = [], // Add teams prop
   onDeleteGame,
   onUpdateGamePhotos, 
+  onUpdateGame, // New prop for updating game data
   externalFilters = {},
   isUserAdmin = false,
 }) {
   const [newTeamName, setNewTeamName] = useState("");
   const [graphData, setGraphData] = useState(null);
   
-  // Local filter state (no longer using external filters)
+  // Local filter state
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [outcomeFilter, setOutcomeFilter] = useState(""); 
@@ -116,10 +203,13 @@ export default function Dashboard({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   
+  // Editing state
+  const [editingGameId, setEditingGameId] = useState(null);
+  const [editingField, setEditingField] = useState(null); // 'location', 'score', 'stats', etc.
+  const [editValues, setEditValues] = useState({});
+  const [editingStat, setEditingStat] = useState(null); // which specific stat is being edited
+  
   const GAMES_PER_PAGE = 4;
-
-  // Remove external filter sync since we're now handling filters locally
-  // (removed useEffect for externalFilters)
 
   // Unique opponent suggestions
   const allOpponents = useMemo(() => {
@@ -129,6 +219,26 @@ export default function Dashboard({
     });
     return Array.from(oppSet);
   }, [stats]);
+
+  // Unique locations for suggestions
+  const allLocations = useMemo(() => {
+    const locSet = new Set();
+    (stats || []).forEach(game => {
+      if (game.location) locSet.add(game.location.trim());
+    });
+    return Array.from(locSet);
+  }, [stats]);
+
+  // Unique teams - deduplicated
+  const uniqueTeams = useMemo(() => {
+    const map = new Map();
+    for (const t of teams) {
+      if (t && t.id && !map.has(t.name.toLowerCase())) {
+        map.set(t.name.toLowerCase(), t);
+      }
+    }
+    return Array.from(map.values());
+  }, [teams]);
 
   const filteredOpponentSuggestions = useMemo(() => {
     if (!searchTerm) return [];
@@ -215,6 +325,66 @@ export default function Dashboard({
   }, [sortedAndFilteredStats, currentPage]);
   
   const totalPages = Math.ceil(sortedAndFilteredStats.length / GAMES_PER_PAGE);
+
+  // Editing functions
+  const startEditing = (gameId, field, currentValue = {}) => {
+    if (!canWrite(user)) {
+      showAccessDenied('edit games');
+      return;
+    }
+    setEditingGameId(gameId);
+    setEditingField(field);
+    setEditValues(currentValue);
+    setEditingStat(null);
+  };
+
+  const startEditingStat = (gameId, statName, currentValue) => {
+    if (!canWrite(user)) {
+      showAccessDenied('edit stats');
+      return;
+    }
+    setEditingGameId(gameId);
+    setEditingField('stats');
+    setEditingStat(statName);
+    setEditValues({[statName]: currentValue});
+  };
+
+  const cancelEditing = () => {
+    setEditingGameId(null);
+    setEditingField(null);
+    setEditValues({});
+    setEditingStat(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editingGameId || !onUpdateGame) return;
+    
+    try {
+      // If editing stats, recalculate points
+      if (editingField === 'stats') {
+        const updatedValues = { ...editValues };
+        
+        // Recalculate points if any shooting stats changed
+        if (['fg2m', 'fg3m', 'ftm'].some(stat => stat in updatedValues)) {
+          // Get current game data to merge with updates
+          const currentGame = stats.find(g => g.id === editingGameId);
+          if (currentGame) {
+            const newStats = { ...currentGame, ...updatedValues };
+            updatedValues.points = (newStats.fg2m * 2) + (newStats.fg3m * 3) + newStats.ftm;
+          }
+        }
+        
+        await onUpdateGame(editingGameId, updatedValues);
+      } else {
+        await onUpdateGame(editingGameId, editValues);
+      }
+      
+      cancelEditing();
+    } catch (error) {
+      console.error("Error updating game:", error);
+      alert("Failed to update game. Please try again.");
+    }
+  };
 
   // Stat graph handler
   const handleStatClick = (statKey, statName) => {
@@ -599,6 +769,8 @@ export default function Dashboard({
                     const expanded = expandedGameIds.includes(game.id);
                     const isSelected = selectedGameIds.includes(game.id);
                     const earnedBadges = getEarnedBadges(game);
+                    const isEditing = editingGameId === game.id;
+                    
                     return (
                       <div
                         key={game.id}
@@ -640,14 +812,74 @@ export default function Dashboard({
                               <p className="font-bold text-lg text-gray-900 dark:text-white">
                                 {formatGameTimestamp(game.timestamp)}
                               </p>
-                              <p className="font-bold text-lg text-orange-500">
-                                {game.teamName} vs {game.opponent}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <div className="font-bold text-lg text-orange-500">
+                                  {isEditing && editingField === 'teamNames' ? (
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="text"
+                                        value={editValues.teamName || ''}
+                                        onChange={(e) => setEditValues({...editValues, teamName: e.target.value})}
+                                        className="text-sm px-2 py-1 border rounded bg-white dark:bg-gray-800 text-orange-500 font-bold min-w-[100px]"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onFocus={(e) => e.target.select()}
+                                        placeholder="Team name"
+                                      />
+                                      <span className="text-orange-500 font-bold">vs</span>
+                                      <input
+                                        type="text"
+                                        value={editValues.opponent || ''}
+                                        onChange={(e) => setEditValues({...editValues, opponent: e.target.value})}
+                                        className="text-sm px-2 py-1 border rounded bg-white dark:bg-gray-800 text-orange-500 font-bold min-w-[100px]"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onFocus={(e) => e.target.select()}
+                                        placeholder="Opponent"
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.stopPropagation();
+                                            saveEdit();
+                                          }
+                                          if (e.key === 'Escape') {
+                                            e.stopPropagation();
+                                            cancelEditing();
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          saveEdit();
+                                        }}
+                                        className="p-1 text-green-500 hover:text-green-600 bg-green-50 dark:bg-green-900/20 rounded"
+                                        title="Save"
+                                      >
+                                        <SaveIcon className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          cancelEditing();
+                                        }}
+                                        className="p-1 text-gray-500 hover:text-gray-600 bg-gray-50 dark:bg-gray-700 rounded"
+                                        title="Cancel"
+                                      >
+                                        <CancelIcon className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span>{game.teamName} vs {game.opponent}</span>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Location display - no editing in collapsed view */}
                               {game.location && (
-                                <p className="text-sm text-gray-600 dark:text-gray-400 italic">
-                                  📍 {game.location}
-                                </p>
+                                <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 italic">
+                                  <LocationIcon className="w-3 h-3" />
+                                  <span>{game.location}</span>
+                                </div>
                               )}
+                              
                               <p className="italic text-xs mt-1 text-gray-700 dark:text-gray-200">
                                 {game.adminName ? `Scored by ${game.adminName}` : ""}
                               </p>
@@ -656,7 +888,7 @@ export default function Dashboard({
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {/* Outcome badge */}
+                            {/* Outcome badge without edit icons in collapsed view */}
                             <span
                               className={`px-2 py-1 text-xs font-bold rounded-full ${
                                 game.outcome === "W"
@@ -668,6 +900,7 @@ export default function Dashboard({
                             >
                               {game.outcome || "T"} {showZero(game.myTeamScore)}-{showZero(game.opponentScore)}
                             </span>
+                            
                             {/* Trash icon - only show for admins and not in selection mode */}
                             {isUserAdmin && !isSelectionMode && (
                               <button
@@ -678,7 +911,7 @@ export default function Dashboard({
                                 }}
                                 title="Delete Game"
                               >
-                                <TrashIcon />
+                                <TrashIcon className="w-4 h-4" />
                               </button>
                             )}
                           </div>
@@ -686,47 +919,386 @@ export default function Dashboard({
                         {/* Expanded view - only show when not in selection mode */}
                         {expanded && !isSelectionMode && (
                           <div className="p-4 pt-2 relative">
-                            {/* Stat grid using the same card style as Career Stats */}
+                            {/* Edit Controls for Expanded View - Only show for admins */}
+                            {isUserAdmin && (
+                              <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-600">
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  {/* Edit Team Names */}
+                                  {isEditing && editingField === 'teamNames' ? (
+                                    <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 p-2 rounded-lg border border-blue-200 dark:border-blue-600">
+                                      <select
+                                        value={editValues.teamName || ''}
+                                        onChange={(e) => setEditValues({...editValues, teamName: e.target.value})}
+                                        className="text-sm px-2 py-1 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-w-[100px]"
+                                        onClick={(e) => e.stopPropagation()}
+                                        autoFocus
+                                      >
+                                        <option value="">Select Team</option>
+                                        {uniqueTeams.map((team) => (
+                                          <option key={team.id} value={team.name}>
+                                            {team.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <span className="text-sm font-bold">vs</span>
+                                      <input
+                                        type="text"
+                                        value={editValues.opponent || ''}
+                                        onChange={(e) => setEditValues({...editValues, opponent: e.target.value})}
+                                        className="text-sm px-2 py-1 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-w-[100px]"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onFocus={(e) => e.target.select()}
+                                        placeholder="Opponent"
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.stopPropagation();
+                                            saveEdit();
+                                          }
+                                          if (e.key === 'Escape') {
+                                            e.stopPropagation();
+                                            cancelEditing();
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          saveEdit();
+                                        }}
+                                        className="p-1 text-green-500 hover:text-green-600 bg-green-100 dark:bg-green-900/30 rounded"
+                                        title="Save"
+                                      >
+                                        <SaveIcon className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          cancelEditing();
+                                        }}
+                                        className="p-1 text-gray-500 hover:text-gray-600 bg-gray-100 dark:bg-gray-700 rounded"
+                                        title="Cancel"
+                                      >
+                                        <CancelIcon className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditing(game.id, 'teamNames', {
+                                          teamName: game.teamName || '',
+                                          opponent: game.opponent || ''
+                                        });
+                                      }}
+                                      className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 rounded-full transition-colors flex items-center gap-1"
+                                      title="Edit Team Names"
+                                    >
+                                      <EditIcon className="w-3 h-3" />
+                                      Team Names
+                                    </button>
+                                  )}
+
+                                  {/* Edit Score */}
+                                  {isEditing && editingField === 'score' ? (
+                                    <div className="flex items-center gap-2 bg-orange-50 dark:bg-orange-900/30 p-2 rounded-lg border border-orange-200 dark:border-orange-600">
+                                      <input
+                                        type="number"
+                                        value={editValues.myTeamScore === 0 ? '' : editValues.myTeamScore}
+                                        onChange={(e) => setEditValues({...editValues, myTeamScore: e.target.value === '' ? 0 : parseInt(e.target.value) || 0})}
+                                        className="w-16 text-sm px-2 py-1 border rounded bg-white dark:bg-gray-800 text-center text-gray-900 dark:text-white"
+                                        placeholder="0"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onFocus={(e) => e.target.select()}
+                                        autoFocus
+                                      />
+                                      <span className="text-sm font-bold">-</span>
+                                      <input
+                                        type="number"
+                                        value={editValues.opponentScore === 0 ? '' : editValues.opponentScore}
+                                        onChange={(e) => setEditValues({...editValues, opponentScore: e.target.value === '' ? 0 : parseInt(e.target.value) || 0})}
+                                        className="w-16 text-sm px-2 py-1 border rounded bg-white dark:bg-gray-800 text-center text-gray-900 dark:text-white"
+                                        placeholder="0"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onFocus={(e) => e.target.select()}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.stopPropagation();
+                                            saveEdit();
+                                          }
+                                          if (e.key === 'Escape') {
+                                            e.stopPropagation();
+                                            cancelEditing();
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          saveEdit();
+                                        }}
+                                        className="p-1 text-green-500 hover:text-green-600 bg-green-100 dark:bg-green-900/30 rounded"
+                                        title="Save"
+                                      >
+                                        <SaveIcon className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          cancelEditing();
+                                        }}
+                                        className="p-1 text-gray-500 hover:text-gray-600 bg-gray-100 dark:bg-gray-700 rounded"
+                                        title="Cancel"
+                                      >
+                                        <CancelIcon className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditing(game.id, 'score', {
+                                          myTeamScore: game.myTeamScore || 0,
+                                          opponentScore: game.opponentScore || 0
+                                        });
+                                      }}
+                                      className="px-3 py-1 text-sm bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800/40 rounded-full transition-colors flex items-center gap-1"
+                                      title="Edit Score"
+                                    >
+                                      <EditIcon className="w-3 h-3" />
+                                      Score
+                                    </button>
+                                  )}
+
+                                  {/* Edit Location */}
+                                  {isEditing && editingField === 'location' ? (
+                                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/30 p-2 rounded-lg border border-green-200 dark:border-green-600">
+                                      <input
+                                        type="text"
+                                        value={editValues.location || ''}
+                                        onChange={(e) => setEditValues({...editValues, location: e.target.value})}
+                                        className="text-sm px-2 py-1 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-w-[120px]"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.stopPropagation();
+                                            saveEdit();
+                                          }
+                                          if (e.key === 'Escape') {
+                                            e.stopPropagation();
+                                            cancelEditing();
+                                          }
+                                        }}
+                                        onFocus={(e) => e.target.select()}
+                                        placeholder="Location"
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          saveEdit();
+                                        }}
+                                        className="p-1 text-green-500 hover:text-green-600 bg-green-100 dark:bg-green-900/30 rounded"
+                                        title="Save"
+                                      >
+                                        <SaveIcon className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          cancelEditing();
+                                        }}
+                                        className="p-1 text-gray-500 hover:text-gray-600 bg-gray-100 dark:bg-gray-700 rounded"
+                                        title="Cancel"
+                                      >
+                                        <CancelIcon className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  ) : game.location ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditing(game.id, 'location', {location: game.location});
+                                      }}
+                                      className="px-3 py-1 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/40 rounded-full transition-colors flex items-center gap-1"
+                                      title="Edit Location"
+                                    >
+                                      <LocationIcon className="w-3 h-3" />
+                                      Location
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditing(game.id, 'location', {location: ''});
+                                      }}
+                                      className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors flex items-center gap-1"
+                                      title="Add Location"
+                                    >
+                                      <LocationIcon className="w-3 h-3" />
+                                      Add Location
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Stat grid using editable StatCard components */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
                               <StatCard
                                 label="Points"
                                 value={showZero(game.points)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'points'}
+                                editValue={editValues.points}
+                                onEdit={() => startEditingStat(game.id, 'points', game.points || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, points: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
-                                label="2-Point Made/Att"
-                                value={`${showZero(game.fg2m)}/${showZero(game.fg2a)}`}
+                                label="2PT Made"
+                                value={showZero(game.fg2m)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'fg2m'}
+                                editValue={editValues.fg2m}
+                                onEdit={() => startEditingStat(game.id, 'fg2m', game.fg2m || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, fg2m: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
-                                label="3-Point Made/Att"
-                                value={`${showZero(game.fg3m)}/${showZero(game.fg3a)}`}
+                                label="2PT Att"
+                                value={showZero(game.fg2a)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'fg2a'}
+                                editValue={editValues.fg2a}
+                                onEdit={() => startEditingStat(game.id, 'fg2a', game.fg2a || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, fg2a: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
-                                label="FT Made/Att"
-                                value={`${showZero(game.ftm)}/${showZero(game.fta)}`}
+                                label="3PT Made"
+                                value={showZero(game.fg3m)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'fg3m'}
+                                editValue={editValues.fg3m}
+                                onEdit={() => startEditingStat(game.id, 'fg3m', game.fg3m || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, fg3m: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
+                              />
+                              <StatCard
+                                label="3PT Att"
+                                value={showZero(game.fg3a)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'fg3a'}
+                                editValue={editValues.fg3a}
+                                onEdit={() => startEditingStat(game.id, 'fg3a', game.fg3a || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, fg3a: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
+                              />
+                              <StatCard
+                                label="FT Made"
+                                value={showZero(game.ftm)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'ftm'}
+                                editValue={editValues.ftm}
+                                onEdit={() => startEditingStat(game.id, 'ftm', game.ftm || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, ftm: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
+                              />
+                              <StatCard
+                                label="FT Att"
+                                value={showZero(game.fta)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'fta'}
+                                editValue={editValues.fta}
+                                onEdit={() => startEditingStat(game.id, 'fta', game.fta || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, fta: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
                                 label="Rebounds"
                                 value={showZero(game.rebounds)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'rebounds'}
+                                editValue={editValues.rebounds}
+                                onEdit={() => startEditingStat(game.id, 'rebounds', game.rebounds || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, rebounds: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
                                 label="Assists"
                                 value={showZero(game.assists)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'assists'}
+                                editValue={editValues.assists}
+                                onEdit={() => startEditingStat(game.id, 'assists', game.assists || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, assists: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
                                 label="Steals"
                                 value={showZero(game.steals)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'steals'}
+                                editValue={editValues.steals}
+                                onEdit={() => startEditingStat(game.id, 'steals', game.steals || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, steals: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
                                 label="Blocks"
                                 value={showZero(game.blocks)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'blocks'}
+                                editValue={editValues.blocks}
+                                onEdit={() => startEditingStat(game.id, 'blocks', game.blocks || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, blocks: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
                                 label="Fouls"
                                 value={showZero(game.fouls)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'fouls'}
+                                editValue={editValues.fouls}
+                                onEdit={() => startEditingStat(game.id, 'fouls', game.fouls || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, fouls: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
                                 label="Turnovers"
                                 value={showZero(game.turnovers)}
+                                editable={isUserAdmin}
+                                isEditing={isEditing && editingField === 'stats' && editingStat === 'turnovers'}
+                                editValue={editValues.turnovers}
+                                onEdit={() => startEditingStat(game.id, 'turnovers', game.turnovers || 0)}
+                                onEditChange={(value) => setEditValues({...editValues, turnovers: value})}
+                                onSave={saveEdit}
+                                onCancel={cancelEditing}
+                                gameId={game.id}
                               />
                               <StatCard
                                 label="A/T Ratio"
@@ -734,6 +1306,7 @@ export default function Dashboard({
                                   showZero(game.assists),
                                   showZero(game.turnovers)
                                 )}
+                                editable={false}
                               />
                             </div>
                             <BadgeDisplay badges={earnedBadges} />

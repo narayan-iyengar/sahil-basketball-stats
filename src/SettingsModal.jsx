@@ -23,6 +23,12 @@ export default function SettingsModal({
 }) {
   const [newTeam, setNewTeam] = useState("");
   const [saveStatus, setSaveStatus] = useState(""); // "saving", "success", "error"
+  const [localPeriodLength, setLocalPeriodLength] = useState(periodLength.toString());
+
+  // Sync local state when props change
+  useEffect(() => {
+    setLocalPeriodLength(periodLength.toString());
+  }, [periodLength]);
 
   // De-dupe teams by id (should not be needed if parent does it right)
   const uniqueTeams = Array.from(
@@ -76,17 +82,32 @@ export default function SettingsModal({
     setTimeout(() => setSaveStatus(""), 1200);
   };
 
-  const handlePeriodLengthChange = async (val) => {
-    const length = Number(val);
-    setSaveStatus("saving");
-    try {
-      await setPeriodLength(length); // This now calls updateGameSettings in App.jsx
-      setSaveStatus("success");
-    } catch (error) {
-      console.error("Error updating period length:", error);
-      setSaveStatus("error");
+  const handlePeriodLengthChange = async (value) => {
+    // Update local state immediately for responsive UI
+    setLocalPeriodLength(value);
+    
+    // Only save to Firebase if it's a valid number
+    const length = parseInt(value) || 0;
+    if (length > 0) {
+      setSaveStatus("saving");
+      try {
+        await setPeriodLength(length); // This now calls updateGameSettings in App.jsx
+        setSaveStatus("success");
+      } catch (error) {
+        console.error("Error updating period length:", error);
+        setSaveStatus("error");
+      }
+      setTimeout(() => setSaveStatus(""), 1200);
     }
-    setTimeout(() => setSaveStatus(""), 1200);
+  };
+
+  // Handle blur event to ensure we have a valid value
+  const handlePeriodLengthBlur = () => {
+    const length = parseInt(localPeriodLength) || 10; // Default to 10 if invalid
+    if (length !== periodLength) {
+      setLocalPeriodLength(length.toString());
+      handlePeriodLengthChange(length.toString());
+    }
   };
 
   // Theme switcher - don't close modal, just toggle theme
@@ -210,12 +231,22 @@ export default function SettingsModal({
               Length (minutes per {gameFormat === "halves" ? "half" : "period"})
             </label>
             <input
-              type="number"
+              type="text"
               min="1"
               max="30"
-              className="bg-gray-100 dark:bg-gray-800 p-2 rounded border border-gray-300 dark:border-gray-600 w-24"
-              value={periodLength}
-              onChange={e => handlePeriodLengthChange(e.target.value)}
+              className="bg-gray-100 dark:bg-gray-800 p-2 rounded border border-gray-300 dark:border-gray-600 w-24 text-gray-900 dark:text-white"
+              value={localPeriodLength}
+              onChange={(e) => {
+                // Allow any input while typing, including empty string
+                setLocalPeriodLength(e.target.value);
+              }}
+              onBlur={handlePeriodLengthBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handlePeriodLengthBlur();
+                }
+              }}
+              placeholder="10"
             />
           </div>
         </div>
