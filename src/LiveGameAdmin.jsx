@@ -321,7 +321,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
           <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 relative">
             <div className="absolute top-2 right-2"><SaveStatusIndicator status={saveStatus} /></div>
 {/* Clock Section - Centered with better period/half label */}
-            <div className="flex justify-center items-center text-center mb-4">
+            <div className="flex justify-center items-center text-center mb-4 text-gray-900 dark:text-white">
               <div className="flex flex-col items-center justify-center">
                 <span className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
                   clockIsUrgent 
@@ -343,7 +343,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
               {/* Home Team */}
               <div className="flex flex-col items-center">
                 <span 
-                  className="font-bold text-center leading-tight break-words hyphens-auto px-1 mb-2"
+                  className="font-bold text-center leading-tight break-words hyphens-auto px-1 mb-2 text-gray-900 dark:text-white"
                   style={{
                     fontSize: `${Math.max(18, Math.min(20, 120 / Math.max(maxNameLength, 6)))}px`
                   }}
@@ -373,7 +373,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
               {/* Away Team */}
               <div className="flex flex-col items-center">
                 <span 
-                  className="font-bold text-center leading-tight break-words hyphens-auto px-1 mb-2"
+                  className="font-bold text-center leading-tight break-words hyphens-auto px-1 mb-2 text-gray-900 dark:text-white"
                   style={{
                     fontSize: `${Math.max(18, Math.min(20, 120 / Math.max(maxNameLength, 6)))}px`
                   }}

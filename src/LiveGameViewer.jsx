@@ -135,12 +135,12 @@ export default function LiveGameViewer({ db, gameId, user }) {
       <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
         <div className="flex justify-around items-center text-center">
           <div className="w-1/3">
-            <h3 className="text-xl md:text-2xl font-bold truncate">{game.teamName}</h3>
-            <p className="text-5xl md:text-7xl font-mono">{game.homeScore}</p>
+            <h3 className="text-xl md:text-2xl font-bold truncate text-gray-900 dark:text-white">{game.teamName}</h3>
+            <p className="text-5xl md:text-7xl font-mono text-gray-900 dark:text-white">{game.homeScore}</p>
           </div>
 <div className="w-1/3">
             <div className="flex flex-col items-center">
-              <p className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
+              <p className={`text-4xl font-mono tracking-wider  text-gray-900 dark:text-white transition-all duration-300  ${
                 clockIsUrgent 
                   ? 'text-red-500 animate-pulse scale-110 font-bold' 
                   : clockIsRed 
@@ -155,8 +155,8 @@ export default function LiveGameViewer({ db, gameId, user }) {
             </div>
           </div>
           <div className="w-1/3">
-            <h3 className="text-xl md:text-2xl font-bold truncate">{game.opponent}</h3>
-            <p className="text-5xl md:text-7xl font-mono">{game.awayScore}</p>
+            <h3 className="text-xl md:text-2xl font-bold truncate text-gray-900 dark:text-white">{game.opponent}</h3>
+            <p className="text-5xl md:text-7xl font-mono text-gray-900 dark:text-white">{game.awayScore}</p>
           </div>
         </div>
       </div>
