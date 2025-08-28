@@ -27,7 +27,7 @@ const WiFiOnIcon = ({ className = "" }) => (
 
 const WiFiOffIcon = ({ className = "" }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M8.5 8.5a5 5 0 017 0M5 12.5a9 9 0 0114 0M12 21l0-8.5m-7-2.5a13 13 0 0114 0" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M8.5 8.5a5 5 0 007 0M5 12.5a9 9 0 0014 0M12 21l0-8.5m-7-2.5a13 13 0 0014 0" />
   </svg>
 );
 
@@ -68,11 +68,8 @@ export default function Header({
     return () => clearInterval(interval);
   }, []);
 
-  // Clean header that blends seamlessly
+  // Clean header that blends seamlessly - no special offline styling
   const getHeaderBgColor = () => {
-    if (!isOnline) {
-      return "bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800";
-    }
     if (isUserAdmin) {
       return "bg-gray-100 dark:bg-gray-900"; // Match the main app background
     }
@@ -284,7 +281,7 @@ export default function Header({
           </div>
         </div>
 
-        {/* Secondary row for mobile sync status */}
+        {/* Secondary row for mobile sync status - only when offline AND has pending items */}
         {!isOnline && isUserAdmin && pendingCount > 0 && (
           <div className="mt-2 lg:hidden flex justify-center">
             <button

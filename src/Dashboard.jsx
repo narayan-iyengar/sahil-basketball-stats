@@ -63,10 +63,55 @@ const CheckIcon = ({ className = "" }) => (
   </svg>
 );
 
+// Cloud sync icon for offline indicators
+const CloudSyncIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+  </svg>
+);
+
+// Offline icon
+const OfflineIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m6 0l-3-3m3 3l-3 3" />
+  </svg>
+);
+
+// Sync icon
+const SyncIcon = ({ className = "", spinning = false }) => (
+  <svg className={`${className} ${spinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
 // Expandable bar icon
 const ExpandableBar = ({ isExpanded, className = "" }) => (
   <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
 );
+
+// Offline status badge for games
+const OfflineStatusBadge = ({ game }) => {
+  if (game.isOffline || game.tempId) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full font-medium" title="Saved offline, will sync when online">
+        <OfflineIcon className="w-3 h-3" />
+        <span className="hidden sm:inline">Offline</span>
+      </span>
+    );
+  }
+  
+  if (game.isOfflineUpdated) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full font-medium" title="Updated offline, will sync when online">
+        <CloudSyncIcon className="w-3 h-3" />
+        <span className="hidden sm:inline">Updated</span>
+      </span>
+    );
+  }
+  
+  return null;
+};
 
 // Card for stat values - now with editing capability
 const StatCard = ({ label, value, onClick, clickable, onEdit, editable, isEditing, editValue, onEditChange, onSave, onCancel, gameId }) => (
@@ -173,12 +218,17 @@ function groupGamesByAge(games) {
 export default function Dashboard({
   user,
   stats = [],
-  teams = [], // Add teams prop
+  teams = [],
   onDeleteGame,
   onUpdateGamePhotos, 
-  onUpdateGame, // New prop for updating game data
+  onUpdateGame,
+  onDeleteTeam,
+  onAddTeam,
   externalFilters = {},
   isUserAdmin = false,
+  isOnline = true,
+  onManualSync,
+  syncInProgress = false,
 }) {
   const [newTeamName, setNewTeamName] = useState("");
   const [graphData, setGraphData] = useState(null);
@@ -247,24 +297,29 @@ export default function Dashboard({
       .slice(0, 7);
   }, [allOpponents, searchTerm]);
 
-  // Aggregate stats
-  const aggregatedStats = (stats || []).reduce((acc, game) => {
-    acc.points = (acc.points || 0) + (parseInt(game.points, 10) || 0);
-    acc.fg2m = (acc.fg2m || 0) + (parseInt(game.fg2m, 10) || 0);
-    acc.fg2a = (acc.fg2a || 0) + (parseInt(game.fg2a, 10) || 0);
-    acc.fg3m = (acc.fg3m || 0) + (parseInt(game.fg3m, 10) || 0);
-    acc.fg3a = (acc.fg3a || 0) + (parseInt(game.fg3a, 10) || 0);
-    acc.ftm = (acc.ftm || 0) + (parseInt(game.ftm, 10) || 0);
-    acc.fta = (acc.fta || 0) + (parseInt(game.fta, 10) || 0);
-    acc.rebounds = (acc.rebounds || 0) + (parseInt(game.rebounds, 10) || 0);
-    acc.assists = (acc.assists || 0) + (parseInt(game.assists, 10) || 0);
-    acc.steals = (acc.steals || 0) + (parseInt(game.steals, 10) || 0);
-    acc.blocks = (acc.blocks || 0) + (parseInt(game.blocks, 10) || 0);
-    acc.fouls = (acc.fouls || 0) + (parseInt(game.fouls, 10) || 0);
-    acc.turnovers = (acc.turnovers || 0) + (parseInt(game.turnovers, 10) || 0);
-    acc.gamesPlayed = (acc.gamesPlayed || 0) + 1;
-    return acc;
-  }, {});
+  // Count offline/pending games
+  const offlineGamesCount = (stats || []).filter(game => game.isOffline || game.tempId || game.isOfflineUpdated).length;
+
+  // Aggregate stats - excluding offline/temp games from calculations
+  const aggregatedStats = (stats || [])
+    .filter(game => !game.isOffline && !game.tempId) // Exclude offline games from aggregation
+    .reduce((acc, game) => {
+      acc.points = (acc.points || 0) + (parseInt(game.points, 10) || 0);
+      acc.fg2m = (acc.fg2m || 0) + (parseInt(game.fg2m, 10) || 0);
+      acc.fg2a = (acc.fg2a || 0) + (parseInt(game.fg2a, 10) || 0);
+      acc.fg3m = (acc.fg3m || 0) + (parseInt(game.fg3m, 10) || 0);
+      acc.fg3a = (acc.fg3a || 0) + (parseInt(game.fg3a, 10) || 0);
+      acc.ftm = (acc.ftm || 0) + (parseInt(game.ftm, 10) || 0);
+      acc.fta = (acc.fta || 0) + (parseInt(game.fta, 10) || 0);
+      acc.rebounds = (acc.rebounds || 0) + (parseInt(game.rebounds, 10) || 0);
+      acc.assists = (acc.assists || 0) + (parseInt(game.assists, 10) || 0);
+      acc.steals = (acc.steals || 0) + (parseInt(game.steals, 10) || 0);
+      acc.blocks = (acc.blocks || 0) + (parseInt(game.blocks, 10) || 0);
+      acc.fouls = (acc.fouls || 0) + (parseInt(game.fouls, 10) || 0);
+      acc.turnovers = (acc.turnovers || 0) + (parseInt(game.turnovers, 10) || 0);
+      acc.gamesPlayed = (acc.gamesPlayed || 0) + 1;
+      return acc;
+    }, {});
 
   const totalFgMade = (aggregatedStats.fg2m || 0) + (aggregatedStats.fg3m || 0);
   const totalFgAtt = (aggregatedStats.fg2a || 0) + (aggregatedStats.fg3a || 0);
@@ -386,16 +441,19 @@ export default function Dashboard({
     }
   };
 
-  // Stat graph handler
+  // Stat graph handler - exclude offline games from graphs
   const handleStatClick = (statKey, statName) => {
+    // Filter out offline games for accurate historical data
+    const syncedGames = stats.filter(game => !game.isOffline && !game.tempId);
+    
     if (statKey === "gamesPlayed") {
       setGraphData({
         statKey,
         statName: "Games Played per Age",
-        data: groupGamesByAge(stats || []),
+        data: groupGamesByAge(syncedGames),
       });
     } else {
-      const data = [...(stats || [])]
+      const data = [...syncedGames]
         .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
         .map((game) => ({
           value:
@@ -514,6 +572,25 @@ export default function Dashboard({
     }
   };
 
+  // Manual sync handler
+  const handleSyncClick = () => {
+    if (!isUserAdmin || syncInProgress) return;
+    
+    if (!isOnline) {
+      alert("You're currently offline. Sync will happen automatically when you're back online.");
+      return;
+    }
+    
+    if (offlineGamesCount === 0) {
+      alert("No offline data to sync.");
+      return;
+    }
+    
+    if (onManualSync) {
+      onManualSync();
+    }
+  };
+
   // Helper to show zero for blank/undefined stat
   const showZero = (val) => (val === undefined || val === null || val === "" ? 0 : val);
 
@@ -555,6 +632,29 @@ export default function Dashboard({
             <h3 className="text-xl font-bold mb-4 text-orange-500">
               Career Totals
             </h3>
+            
+            {/* Show offline data notice if there are offline games */}
+            {offlineGamesCount > 0 && (
+              <div className="mb-4 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-800 dark:text-yellow-200">
+                <div className="flex items-center gap-1">
+                  <OfflineIcon className="w-3 h-3" />
+                  <span>{offlineGamesCount} game{offlineGamesCount !== 1 ? 's' : ''} pending sync</span>
+                  {isUserAdmin && isOnline && (
+                    <button
+                      onClick={handleSyncClick}
+                      disabled={syncInProgress}
+                      className="ml-2 px-2 py-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-400 text-yellow-900 rounded text-xs font-medium"
+                    >
+                      {syncInProgress ? "Syncing..." : "Sync Now"}
+                    </button>
+                  )}
+                </div>
+                <div className="text-xs mt-1 text-yellow-700 dark:text-yellow-300">
+                  Stats shown exclude unsynced games
+                </div>
+              </div>
+            )}
+            
             <div className="grid grid-cols-3 gap-3 text-center">
               <StatCard
                 label="Games Played"
@@ -826,9 +926,18 @@ export default function Dashboard({
                                 </div>
                               )}
                               
-                              <p className="italic text-xs mt-1 text-gray-700 dark:text-gray-200">
-                                {game.adminName ? `Scored by ${game.adminName}` : ""}
-                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                {/* Admin name */}
+                                {game.adminName && (
+                                  <p className="italic text-xs text-gray-700 dark:text-gray-200">
+                                    Scored by {game.adminName}
+                                  </p>
+                                )}
+                                
+                                {/* Offline status badge */}
+                                <OfflineStatusBadge game={game} />
+                              </div>
+                              
                               <BadgeSummary badges={earnedBadges} />
                               <PhotoThumbnails photos={game.photos} />
                             </div>
@@ -865,6 +974,21 @@ export default function Dashboard({
                         {/* Expanded view - only show when not in selection mode */}
                         {expanded && !isSelectionMode && (
                           <div className="p-4 pt-2 relative">
+                            {/* Show warning for offline/temp games */}
+                            {(game.isOffline || game.tempId || game.isOfflineUpdated) && (
+                              <div className="mb-4 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-sm">
+                                <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+                                  <OfflineIcon className="w-4 h-4" />
+                                  <span>
+                                    {game.isOffline || game.tempId 
+                                      ? "This game was created offline and will sync when online."
+                                      : "This game has offline updates that will sync when online."
+                                    }
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            
                             {/* Edit Controls for Expanded View - Only show for admins */}
                             {isUserAdmin && (
                               <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-600">
@@ -1230,32 +1354,32 @@ export default function Dashboard({
       </div>
       
       {/* Bulk Delete confirmation modal - only for admins */}
-{isUserAdmin && showBulkDeleteConfirm && (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-    <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm mx-auto">
-      <h3 className="text-lg font-bold mb-4 text-red-500">
-        Delete {selectedGameIds.length} Games?
-      </h3>
-      <p className="mb-6 text-gray-900 dark:text-white">
-        Are you sure you want to delete {selectedGameIds.length} selected game{selectedGameIds.length !== 1 ? 's' : ''}? This cannot be undone.
-      </p>
-      <div className="flex gap-4 justify-end">
-        <button
-          className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white"
-          onClick={() => setShowBulkDeleteConfirm(false)}
-        >
-          Cancel
-        </button>
-        <button
-          className="px-4 py-2 rounded bg-red-500 text-white font-bold"
-          onClick={confirmBulkDelete}
-        >
-          Delete {selectedGameIds.length} Game{selectedGameIds.length !== 1 ? 's' : ''}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {isUserAdmin && showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm mx-auto">
+            <h3 className="text-lg font-bold mb-4 text-red-500">
+              Delete {selectedGameIds.length} Games?
+            </h3>
+            <p className="mb-6 text-gray-900 dark:text-white">
+              Are you sure you want to delete {selectedGameIds.length} selected game{selectedGameIds.length !== 1 ? 's' : ''}? This cannot be undone.
+            </p>
+            <div className="flex gap-4 justify-end">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-500 text-white font-bold"
+                onClick={confirmBulkDelete}
+              >
+                Delete {selectedGameIds.length} Game{selectedGameIds.length !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal - only for admins */}
       {isUserAdmin && deletingGameId && (
@@ -1276,12 +1400,7 @@ export default function Dashboard({
               </button>
               <button
                 className="px-4 py-2 rounded bg-red-500 text-white font-bold"
-                onClick={() => {
-                  if (deletingGameId) {
-                    onDeleteGame(deletingGameId);
-                    setDeletingGameId(null);
-                  }
-                }}
+                onClick={confirmDeleteGame}
               >
                 Delete
               </button>
