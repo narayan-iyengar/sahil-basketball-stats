@@ -13,6 +13,11 @@ import LiveGameViewer from "./LiveGameViewer";
 import StatEntry from "./StatEntry";
 import SettingsModal from "./SettingsModal";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
+import { useNetworkStatus } from "./hooks/useNetworkStatus";
+import { OfflineStorage } from "./utils/offlineUtils";
+import { SyncService } from "./services/syncService";
+import SyncStatusIndicator from "./components/SyncStatusIndicator";
+
 
 // Import admin utilities
 import { 
@@ -54,6 +59,48 @@ export default function App() {
   const [globalPeriodLength, setGlobalPeriodLength] = useState(20);
   const [globalNumPeriods, setGlobalNumPeriods] = useState(2);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+
+  // Offline & Sync
+  const { isOnline, wasOffline } = useNetworkStatus();
+  const [syncInProgress, setSyncInProgress] = useState(false);
+  const [lastSyncAttempt, setLastSyncAttempt] = useState(null);
+  
+  // sync Effect and status
+  useEffect(() => {
+  if (isOnline && wasOffline && user && !syncInProgress) {
+    const pendingCount = OfflineStorage.getPendingCount();
+    if (pendingCount > 0) {
+      console.log(`Coming back online with ${pendingCount} pending items`);
+      autoSync();
+    }
+  }
+}, [isOnline, wasOffline, user, syncInProgress]);
+
+
+const autoSync = useCallback(async () => {
+  if (!user || syncInProgress) return;
+  
+  setSyncInProgress(true);
+  setLastSyncAttempt(Date.now());
+  
+  try {
+    const result = await SyncService.syncAllOfflineData(user);
+    console.log("Auto-sync result:", result);
+    
+    if (result.success) {
+      // Refresh data after successful sync
+      const gamesCol = collection(db, "games");
+      const snap = await getDocs(gamesCol);
+      setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }
+  } catch (error) {
+    console.error("Auto-sync failed:", error);
+  } finally {
+    setSyncInProgress(false);
+  }
+}, [user, syncInProgress]);
+
 
   // --- AUTH LOGIC WITH SETTINGS LOADING ---
   useEffect(() => {
@@ -237,34 +284,83 @@ export default function App() {
     setGames((g) => [...g, { ...game, id: docRef.id }]);
   }, [user]);
 
+  //const handleAddStat = useCallback(async (stat) => {
+  //  if (!canWrite(user)) {
+  //    showAccessDenied('add statistics');
+  //    return;
+  //  }
+  //  
+  //  const points = (stat.fg2m * 2) + (stat.fg3m * 3) + stat.ftm;
+  //  
+  //  let outcome = "T";
+  //  if (stat.myTeamScore > stat.opponentScore) outcome = "W";
+  //  else if (stat.myTeamScore < stat.opponentScore) outcome = "L";
+  //
+  //  const gameRecord = {
+  //    ...currentGameConfig,
+  //    ...stat,
+  //    points,
+  //    outcome,
+  //    status: "final",
+  //    createdAt: new Date().toISOString(),
+  //    adminName: user?.displayName ? user.displayName.split(" ")[0] : "",
+  //  };
+  //
+  //  const docRef = await addDoc(collection(db, "games"), gameRecord);
+  //  setGames((g) => [...g, { ...gameRecord, id: docRef.id }]);
+  //  
+  //  setCurrentGameConfig(null);
+  //  setPage("dashboard");
+  //}, [currentGameConfig, user]);
   const handleAddStat = useCallback(async (stat) => {
-    if (!canWrite(user)) {
-      showAccessDenied('add statistics');
-      return;
+  if (!canWrite(user)) {
+    showAccessDenied('add statistics');
+    return;
+  }
+  
+  const points = (stat.fg2m * 2) + (stat.fg3m * 3) + stat.ftm;
+  
+  let outcome = "T";
+  if (stat.myTeamScore > stat.opponentScore) outcome = "W";
+  else if (stat.myTeamScore < stat.opponentScore) outcome = "L";
+
+  const gameRecord = {
+    ...currentGameConfig,
+    ...stat,
+    points,
+    outcome,
+    status: "final",
+    createdAt: new Date().toISOString(),
+    adminName: user?.displayName ? user.displayName.split(" ")[0] : "",
+  };
+
+  try {
+    if (isOnline) {
+      // Try online first
+      const docRef = await addDoc(collection(db, "games"), gameRecord);
+      setGames((g) => [...g, { ...gameRecord, id: docRef.id }]);
+      console.log("Game saved online:", docRef.id);
+    } else {
+      throw new Error("Offline mode");
     }
+  } catch (error) {
+    console.log("Saving offline:", error.message);
+    // Save offline
+    const tempId = OfflineStorage.savePendingGame(gameRecord);
+    setGames((g) => [...g, { 
+      ...gameRecord, 
+      id: tempId, 
+      isOffline: true,
+      tempId: tempId 
+    }]);
     
-    const points = (stat.fg2m * 2) + (stat.fg3m * 3) + stat.ftm;
-    
-    let outcome = "T";
-    if (stat.myTeamScore > stat.opponentScore) outcome = "W";
-    else if (stat.myTeamScore < stat.opponentScore) outcome = "L";
-
-    const gameRecord = {
-      ...currentGameConfig,
-      ...stat,
-      points,
-      outcome,
-      status: "final",
-      createdAt: new Date().toISOString(),
-      adminName: user?.displayName ? user.displayName.split(" ")[0] : "",
-    };
-
-    const docRef = await addDoc(collection(db, "games"), gameRecord);
-    setGames((g) => [...g, { ...gameRecord, id: docRef.id }]);
-    
-    setCurrentGameConfig(null);
-    setPage("dashboard");
-  }, [currentGameConfig, user]);
+    // Show user feedback
+    alert(`Game saved offline. Will sync when connection is restored.`);
+  }
+  
+  setCurrentGameConfig(null);
+  setPage("dashboard");
+}, [currentGameConfig, user, isOnline]);
 
   const handleDeleteGame = useCallback(async (gameId) => {
     if (!canDelete(user)) {
@@ -309,6 +405,10 @@ const handleUpdateGame = useCallback(async (gameId, updates) => {
     throw error;
   }
 }, [user]);
+
+
+
+
 
   // --- END GAME LOGIC ---
   const handleEndGame = async (liveGameId) => {

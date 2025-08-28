@@ -21,6 +21,11 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const provider = new GoogleAuthProvider();
 
+// Add this line to force account selection
+provider.setCustomParameters({
+  prompt: 'select_account'
+});
+
 
 // Helper function for anonymous sign-in
 export const signInAnonymousUser = async () => {

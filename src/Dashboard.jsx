@@ -1230,32 +1230,32 @@ export default function Dashboard({
       </div>
       
       {/* Bulk Delete confirmation modal - only for admins */}
-      {isUserAdmin && showBulkDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm mx-auto">
-            <h3 className="text-lg font-bold mb-4 text-red-500">
-              Delete {selectedGameIds.length} Games?
-            </h3>
-            <p className="mb-6">
-              Are you sure you want to delete {selectedGameIds.length} selected game{selectedGameIds.length !== 1 ? 's' : ''}? This cannot be undone.
-            </p>
-            <div className="flex gap-4 justify-end">
-              <button
-                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700"
-                onClick={() => setShowBulkDeleteConfirm(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 rounded bg-red-500 text-white font-bold"
-                onClick={confirmBulkDelete}
-              >
-                Delete {selectedGameIds.length} Game{selectedGameIds.length !== 1 ? 's' : ''}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{isUserAdmin && showBulkDeleteConfirm && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-sm mx-auto">
+      <h3 className="text-lg font-bold mb-4 text-red-500">
+        Delete {selectedGameIds.length} Games?
+      </h3>
+      <p className="mb-6 text-gray-900 dark:text-white">
+        Are you sure you want to delete {selectedGameIds.length} selected game{selectedGameIds.length !== 1 ? 's' : ''}? This cannot be undone.
+      </p>
+      <div className="flex gap-4 justify-end">
+        <button
+          className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white"
+          onClick={() => setShowBulkDeleteConfirm(false)}
+        >
+          Cancel
+        </button>
+        <button
+          className="px-4 py-2 rounded bg-red-500 text-white font-bold"
+          onClick={confirmBulkDelete}
+        >
+          Delete {selectedGameIds.length} Game{selectedGameIds.length !== 1 ? 's' : ''}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Delete confirmation modal - only for admins */}
       {isUserAdmin && deletingGameId && (
@@ -1264,12 +1264,12 @@ export default function Dashboard({
             <h3 className="text-lg font-bold mb-4 text-red-500">
               Delete Game?
             </h3>
-            <p className="mb-6">
+            <p className="mb-6 text-gray-900 dark:text-white">
               Are you sure you want to delete this game? This cannot be undone.
             </p>
             <div className="flex gap-4 justify-end">
               <button
-                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700"
+                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 dark:text-white"
                 onClick={() => setDeletingGameId(null)}
               >
                 Cancel
