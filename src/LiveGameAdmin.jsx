@@ -11,7 +11,7 @@ const ExpandableBar = ({ isExpanded, className = "" }) => (
   <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
 );
 
-export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
+export default function LiveGameAdmin({ db, gameId, user, onEndGame, isOnline }) {
   const [game, setGame] = useState(null);
   const [shareMessage, setShareMessage] = useState("");
   const [statsCollapsed, setStatsCollapsed] = useState(false);
@@ -135,6 +135,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
   };
 
   // --- Score handlers
+  /*
   const handleScoreChange = (team, delta) => {
     if (!game) return;
     const key = team === "home" ? "homeScore" : "awayScore";
@@ -153,6 +154,36 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
     const updatePromise = updateDoc(doc(db, "liveGames", gameId), updates);
     showSaveIndicator(updatePromise);
   };
+  */
+ // In LiveGameAdmin.jsx - update score and stat handlers:
+
+const handleScoreChange = (team, delta) => {
+  if (!game) return;
+  const key = team === "home" ? "homeScore" : "awayScore";
+  if (delta < 0 && game[key] <= 0) return;
+  
+  const updates = { [key]: increment(delta) };
+  
+  if (!game.isRunning) {
+    const now = Date.now();
+    updates.isRunning = true;
+    updates.clockStartTime = now;
+    updates.clockAtStart = game.clock || (game.periodLength * 60);
+  }
+  
+  let updatePromise;
+  if (isOnline) {
+    updatePromise = updateDoc(doc(db, "liveGames", gameId), updates);
+  } else {
+    // Save offline
+    OfflineStorage.savePendingLiveUpdate(gameId, updates);
+    updatePromise = Promise.resolve();
+    // Update local state immediately for responsive UI
+    setGame(prev => ({ ...prev, [key]: prev[key] + delta }));
+  }
+  
+  showSaveIndicator(updatePromise);
+};
 
   // --- Stat handlers
   const handleStatChange = (stat, delta) => {
@@ -447,9 +478,19 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
       <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-50">
         <div className="w-full max-w-md mx-auto p-3">
           <div className="grid grid-cols-3 gap-3">
-            <button onClick={handleShare} className="w-full py-3 rounded-lg font-bold text-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center">
-              {shareMessage ? shareMessage : <ShareIcon />}
-            </button>
+<button 
+  onClick={isOnline ? handleShare : null}
+  disabled={!isOnline}
+  className={`w-full py-3 rounded-lg font-bold text-lg flex items-center justify-center ${
+    isOnline 
+      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+      : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+  }`}
+  title={isOnline ? "Share live game link" : "Share unavailable offline"}
+>
+  {shareMessage ? shareMessage : <ShareIcon />}
+  {!isOnline && <span className="ml-2 text-sm">(Offline)</span>}
+</button>
             <button
               onClick={toggleClock}
               className={`w-full py-3 rounded-lg font-bold text-lg ${game.isRunning ? "bg-yellow-500 text-black" : "bg-green-500 text-white"}`}

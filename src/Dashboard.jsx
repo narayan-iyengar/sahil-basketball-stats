@@ -634,26 +634,19 @@ export default function Dashboard({
             </h3>
             
             {/* Show offline data notice if there are offline games */}
-            {offlineGamesCount > 0 && (
-              <div className="mb-4 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-800 dark:text-yellow-200">
-                <div className="flex items-center gap-1">
-                  <OfflineIcon className="w-3 h-3" />
-                  <span>{offlineGamesCount} game{offlineGamesCount !== 1 ? 's' : ''} pending sync</span>
-                  {isUserAdmin && isOnline && (
-                    <button
-                      onClick={handleSyncClick}
-                      disabled={syncInProgress}
-                      className="ml-2 px-2 py-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-400 text-yellow-900 rounded text-xs font-medium"
-                    >
-                      {syncInProgress ? "Syncing..." : "Sync Now"}
-                    </button>
-                  )}
-                </div>
-                <div className="text-xs mt-1 text-yellow-700 dark:text-yellow-300">
-                  Stats shown exclude unsynced games
-                </div>
-              </div>
-            )}
+{offlineGamesCount > 0 && (
+  <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-800 dark:text-blue-200">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-1">
+        <OfflineIcon className="w-3 h-3" />
+        <span>{offlineGamesCount} game{offlineGamesCount !== 1 ? 's' : ''} saved offline</span>
+      </div>
+      <span className="text-blue-600 dark:text-blue-300">
+        Use settings to sync →
+      </span>
+    </div>
+  </div>
+)}
             
             <div className="grid grid-cols-3 gap-3 text-center">
               <StatCard

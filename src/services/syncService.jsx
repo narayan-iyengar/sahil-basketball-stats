@@ -83,6 +83,43 @@ export class SyncService {
     }
   }
 
+
+
+
+static async syncPendingTeams(results) {
+  const pendingTeams = OfflineStorage.getPendingTeams();
+  
+  for (let i = 0; i < pendingTeams.length; i++) {
+    const team = pendingTeams[i];
+    
+    try {
+      this.notifyCallbacks('syncing', {
+        type: 'teams',
+        current: i + 1,
+        total: pendingTeams.length,
+        item: team.name
+      });
+
+      const { tempId, offlineCreatedAt, ...teamData } = team;
+      
+      // Add the team to Firebase
+      const docRef = await addDoc(collection(db, "teams"), teamData);
+      
+      // Remove from pending list
+      OfflineStorage.removePendingTeam(tempId);
+      
+      results.teams = results.teams || { synced: 0, failed: 0 };
+      results.teams.synced++;
+      
+      console.log(`Synced team: ${team.name} (${tempId} -> ${docRef.id})`);
+
+    } catch (error) {
+      console.error(`Failed to sync team ${team.tempId}:`, error);
+      results.teams = results.teams || { synced: 0, failed: 0 };
+      results.teams.failed++;
+    }
+  }
+}
   // Sync pending new games
   static async syncPendingGames(results) {
     const pendingGames = OfflineStorage.getPendingGames();

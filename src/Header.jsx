@@ -197,19 +197,22 @@ export default function Header({
             </div>
 
             {/* Sync Indicator for Online Pending Items */}
-            {isOnline && pendingCount > 0 && isUserAdmin && (
-              <button
-                onClick={handleSyncClick}
-                disabled={syncInProgress}
-                className="flex items-center gap-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 rounded-full text-xs transition-colors disabled:opacity-50"
-                title={`${pendingCount} items ready to sync`}
-              >
-                <SyncIcon className="w-3 h-3" spinning={syncInProgress} />
-                <span className="hidden sm:inline">
-                  {syncInProgress ? "Syncing..." : `${pendingCount} pending`}
-                </span>
-              </button>
-            )}
+{isOnline && pendingCount > 0 && isUserAdmin && (
+  <button
+    onClick={handleSyncClick}
+    disabled={syncInProgress}
+    className="flex items-center gap-2 px-3 py-2 bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-800/40 text-orange-700 dark:text-orange-300 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
+    title={`Sync ${pendingCount} offline items to Firebase`}
+  >
+    <SyncIcon className="w-4 h-4" spinning={syncInProgress} />
+    <span className="hidden sm:inline">
+      {syncInProgress ? "Syncing..." : `Sync ${pendingCount}`}
+    </span>
+    <span className="sm:hidden">
+      {syncInProgress ? "..." : pendingCount}
+    </span>
+  </button>
+)}
           </div>
 
           {/* Right: Controls - Settings, Dashboard, Sign Out/In */}
@@ -241,7 +244,7 @@ export default function Header({
               <ChartIcon className="h-5 w-5" />
             </button>
 
-            {/* Sync Status Indicator - Compact version for header */}
+            {/* 
             {isUserAdmin && (
               <div className="hidden lg:block">
                 <SyncStatusIndicator 
@@ -253,6 +256,7 @@ export default function Header({
                 />
               </div>
             )}
+            */}
 
             {/* Sign Out/Sign In Button - Enhanced for admins */}
             {user && !user.isAnonymous ? (

@@ -161,6 +161,8 @@ export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline =
     setConfig((prev) => ({ ...prev, [name]: value }));
   };
 
+
+  /*
   const handleSubmit = (mode) => {
     if (!config.teamName || !config.opponent) {
       setError("Please enter a team name and opponent name.");
@@ -176,6 +178,35 @@ export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline =
       setError("Internal error: Game submit not available.");
     }
   };
+  */
+
+  //offline submit
+  // In GameSetup.jsx - update handleSubmit:
+
+const handleSubmit = (mode) => {
+  if (!config.teamName || !config.opponent) {
+    setError("Please enter a team name and opponent name.");
+    return;
+  }
+  
+  if (mode === "live" && !isOnline) {
+    // Allow offline live games but warn user
+    const confirmed = window.confirm(
+      "You're offline. This will create a live game that you can score locally. " +
+      "It will sync when you're back online. Continue?"
+    );
+    if (!confirmed) return;
+  }
+  
+  setError("");
+  const gameTimestamp = new Date(`${config.date}T${config.time}`).toISOString();
+  
+  if (typeof onSubmit === "function") {
+    onSubmit({ ...config, timestamp: gameTimestamp }, mode);
+  } else {
+    setError("Internal error: Game submit not available.");
+  }
+};
 
   return (
     <div className="max-w-xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
@@ -385,32 +416,24 @@ export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline =
           )}
         </div>
         
-        <div className="border-t border-gray-200 dark:border-gray-600 pt-6 space-y-4">
-          {/* Live Game Button - disabled when offline */}
-          <button
-            onClick={() => handleSubmit("live")}
-            disabled={!isOnline}
-            className={`w-full font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg ${
-              isOnline 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                : 'bg-gray-400 text-gray-600 cursor-not-allowed'
-            }`}
-            title={!isOnline ? "Live games require an internet connection" : "Start Live Game & Track Stats"}
-          >
-            {!isOnline && <span className="mr-2">🌐</span>}
-            Start Live Game & Track Stats
-            {!isOnline && <span className="ml-2 text-sm">(Requires Internet)</span>}
-          </button>
-          
-          {/* Regular Game Button - always available */}
-          <button
-            onClick={() => handleSubmit("final")}
-            className="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg border border-gray-300 dark:border-gray-600"
-          >
-            Enter Final Stats Only
-            {!isOnline && <span className="ml-2 text-sm">(Works Offline)</span>}
-          </button>
-        </div>
+<div className="border-t border-gray-200 dark:border-gray-600 pt-6 space-y-4">
+  {/* Live Game Button - now works offline */}
+  <button
+    onClick={() => handleSubmit("live")}
+    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg"
+    title="Start Live Game & Track Stats"
+  >
+    Start Live Game & Track Stats
+  </button>
+  
+  {/* Regular Game Button - same as before */}
+  <button
+    onClick={() => handleSubmit("final")}
+    className="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg border border-gray-300 dark:border-gray-600"
+  >
+    Enter Final Stats Only
+  </button>
+</div>
       </div>
     </div>
   );

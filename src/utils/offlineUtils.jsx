@@ -144,4 +144,27 @@ export class OfflineStorage {
       syncStatus: this.getSyncStatus()
     };
   }
+
+static savePendingTeam(teamData) {
+  const pending = this.getPendingTeams();
+  const teamWithId = { 
+    ...teamData, 
+    tempId: `temp_team_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    offlineCreatedAt: new Date().toISOString()
+  };
+  pending.push(teamWithId);
+  localStorage.setItem('sahil_stats_pending_teams', JSON.stringify(pending));
+  return teamWithId.tempId;
+}
+
+static getPendingTeams() {
+  const stored = localStorage.getItem('sahil_stats_pending_teams');
+  return stored ? JSON.parse(stored) : [];
+}
+
+static removePendingTeam(tempId) {
+  const pending = this.getPendingTeams();
+  const filtered = pending.filter(team => team.tempId !== tempId);
+  localStorage.setItem('sahil_stats_pending_teams', JSON.stringify(filtered));
+}
 }

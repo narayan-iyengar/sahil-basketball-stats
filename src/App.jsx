@@ -635,10 +635,10 @@ export default function App() {
       return;
     }
     
-    if (!isOnline && mode === "live") {
-      alert("Live games require an internet connection to share with viewers. You can still create a regular game and enter stats offline.");
-      return;
-    }
+    //if (!isOnline && mode === "live") {
+    //  alert("Live games require an internet connection to share with viewers. You can still create a regular game and enter stats offline.");
+    //  return;
+    //}
     
     const newGame = {
       ...config,
@@ -661,7 +661,7 @@ export default function App() {
       periodLength: globalPeriodLength || 20,
       numPeriods: globalGameFormat === "halves" ? 2 : 4,
     };
-    
+    /*
     if (mode === "live") {
       if (!canManageLiveGames(user)) {
         showAccessDenied('start live games');
@@ -679,6 +679,24 @@ export default function App() {
       setCurrentGameConfig(newGame);
       setPage("add_stat");
     }
+    */
+if (mode === "live") {
+  if (!canManageLiveGames(user)) {
+    showAccessDenied('start live games');
+    return;
+  }
+  try {
+    const docRef = await addDoc(collection(db, "liveGames"), newGame);
+    setLiveGameId(docRef.id);
+    setPage("live_admin");
+  } catch (error) {
+    // If offline, create local live game
+    const tempId = `temp_live_${Date.now()}`;
+    setLiveGameId(tempId);
+    setPage("live_admin");
+    console.log("Created offline live game");
+  }
+}
   };
 
   // Settings modal handler
@@ -834,7 +852,11 @@ export default function App() {
         syncInProgress={syncInProgress}
       />
       
-      {/* Offline Banner */}
+      
+      
+      {/* Offline Banner Code */}
+      
+      {/*  
       {!isOnline && (
         <div className="bg-yellow-100 dark:bg-yellow-900 border-b border-yellow-400 dark:border-yellow-600 text-yellow-800 dark:text-yellow-200 px-4 py-2 text-center text-sm">
           <div className="flex items-center justify-center gap-2">
@@ -854,6 +876,7 @@ export default function App() {
           </div>
         </div>
       )}
+      */}
       
       <SettingsModal
         open={settingsOpen}
@@ -869,6 +892,11 @@ export default function App() {
         toggleTheme={toggleTheme}
         setPage={setPage}
         onDeleteAllLiveGames={handleDeleteAllLiveGames}
+        isOnline={isOnline}
+        pendingCount={OfflineStorage.getPendingCount()}
+        onManualSync={handleManualSync}
+        syncInProgress={syncInProgress}
+        isUserAdmin={isUserAdmin}
       />
       
       <main className="flex-1">
