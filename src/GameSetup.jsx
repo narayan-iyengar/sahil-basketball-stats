@@ -17,7 +17,7 @@ const GPSIcon = ({ className = "" }) => (
   </svg>
 );
 
-export default function GameSetup({ teams = [], stats = [], onSubmit }) {
+export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline = true }) {
   const [config, setConfig] = useState({
     teamName: "",
     opponent: "",
@@ -34,6 +34,7 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
   });
   const [error, setError] = useState("");
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [useManualTeamEntry, setUseManualTeamEntry] = useState(!isOnline);
   
   const uniqueTeams = useMemo(() => {
     // De-dupe by id and name (just in case)
@@ -57,11 +58,19 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
     return [...locationSet].sort();
   }, [stats]);
 
+  // Set default team when online and teams are available
   useEffect(() => {
-    if (uniqueTeams.length > 0 && !config.teamName) {
+    if (isOnline && uniqueTeams.length > 0 && !config.teamName && !useManualTeamEntry) {
       setConfig((prev) => ({ ...prev, teamName: uniqueTeams[0].name }));
     }
-  }, [uniqueTeams, config.teamName]);
+  }, [uniqueTeams, config.teamName, isOnline, useManualTeamEntry]);
+
+  // Auto-switch to manual entry when offline
+  useEffect(() => {
+    if (!isOnline) {
+      setUseManualTeamEntry(true);
+    }
+  }, [isOnline]);
 
   const handleOpponentChange = (e) => {
     const value = e.target.value;
@@ -71,6 +80,11 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
   const handleLocationChange = (e) => {
     const value = e.target.value;
     setConfig((prev) => ({ ...prev, location: value }));
+  };
+
+  const handleTeamNameChange = (e) => {
+    const value = e.target.value;
+    setConfig((prev) => ({ ...prev, teamName: value }));
   };
 
   // Auto-detect location using geolocation
@@ -110,7 +124,11 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
       },
       (error) => {
         console.error("Error getting location:", error);
-        alert("Unable to get your location. Please enter manually.");
+        if (!isOnline) {
+          alert("Unable to get your location while offline. Please enter manually.");
+        } else {
+          alert("Unable to get your location. Please enter manually.");
+        }
         setIsGettingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
@@ -145,7 +163,7 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
 
   const handleSubmit = (mode) => {
     if (!config.teamName || !config.opponent) {
-      setError("Please select a team and enter an opponent name.");
+      setError("Please enter a team name and opponent name.");
       return;
     }
     setError("");
@@ -161,6 +179,18 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
 
   return (
     <div className="max-w-xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+      {/* Offline Notice */}
+      {!isOnline && (
+        <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <div className="text-sm text-yellow-800 dark:text-yellow-200">
+            <div className="font-medium mb-1">📱 Offline Mode</div>
+            <div className="text-xs text-yellow-700 dark:text-yellow-300">
+              You can create games offline, but live sharing requires an internet connection.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header with centered date/time */}
       <div className="flex items-center justify-center mb-6">
         <div className="flex items-center gap-2">
@@ -188,24 +218,54 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
       )}
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Sahil's Team
-          </label>
-          <select
-            name="teamName"
-            value={config.teamName}
-            onChange={handleChange}
-            className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full appearance-none"
-          >
-            <option value="" disabled>
-              Select Team
-            </option>
-            {uniqueTeams.map((team) => (
-              <option key={team.id} value={team.name}>
-                {team.name}
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Sahil's Team
+            </label>
+            {/* Toggle between dropdown and manual entry - only show when online */}
+            {isOnline && uniqueTeams.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUseManualTeamEntry(!useManualTeamEntry);
+                  setConfig(prev => ({ ...prev, teamName: "" }));
+                }}
+                className="text-xs text-blue-500 hover:text-blue-600 underline"
+              >
+                {useManualTeamEntry ? "Choose from list" : "Enter manually"}
+              </button>
+            )}
+          </div>
+          
+          {useManualTeamEntry || !isOnline || uniqueTeams.length === 0 ? (
+            <input
+              type="text"
+              placeholder="Enter team name (e.g., Sahil's Team)"
+              value={config.teamName}
+              onChange={handleTeamNameChange}
+              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
+              required
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
+            />
+          ) : (
+            <select
+              name="teamName"
+              value={config.teamName}
+              onChange={handleChange}
+              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full appearance-none"
+            >
+              <option value="" disabled>
+                Select Team
               </option>
-            ))}
-          </select>
+              {uniqueTeams.map((team) => (
+                <option key={team.id} value={team.name}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         
         <div>
@@ -224,8 +284,8 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
             autoCorrect="off"
             spellCheck="false"
           />
-          {/* Status indicators */}
-          {config.opponent && (
+          {/* Status indicators - only show when online */}
+          {isOnline && config.opponent && (
             <div className="mt-2 text-sm">
               {opponentExists ? (
                 <div className="flex items-center text-green-600 dark:text-green-400">
@@ -294,8 +354,8 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
             </button>
           </div>
           
-          {/* Location suggestions */}
-          {suggestedLocations.length > 0 && (
+          {/* Location suggestions - only show when online */}
+          {isOnline && suggestedLocations.length > 0 && (
             <div className="mt-2 text-sm">
               <div className="text-gray-600 dark:text-gray-400 mb-1">Previous locations:</div>
               <div className="flex flex-wrap gap-1">
@@ -326,17 +386,29 @@ export default function GameSetup({ teams = [], stats = [], onSubmit }) {
         </div>
         
         <div className="border-t border-gray-200 dark:border-gray-600 pt-6 space-y-4">
+          {/* Live Game Button - disabled when offline */}
           <button
             onClick={() => handleSubmit("live")}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg"
+            disabled={!isOnline}
+            className={`w-full font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg ${
+              isOnline 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+            }`}
+            title={!isOnline ? "Live games require an internet connection" : "Start Live Game & Track Stats"}
           >
+            {!isOnline && <span className="mr-2">🌐</span>}
             Start Live Game & Track Stats
+            {!isOnline && <span className="ml-2 text-sm">(Requires Internet)</span>}
           </button>
+          
+          {/* Regular Game Button - always available */}
           <button
             onClick={() => handleSubmit("final")}
             className="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg border border-gray-300 dark:border-gray-600"
           >
             Enter Final Stats Only
+            {!isOnline && <span className="ml-2 text-sm">(Works Offline)</span>}
           </button>
         </div>
       </div>

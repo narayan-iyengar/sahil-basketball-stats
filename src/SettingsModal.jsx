@@ -149,16 +149,6 @@ export default function SettingsModal({
           <SaveStatusIndicator status={saveStatus} />
         </h2>
 
-        {/* Cross-Device Sync Notice */}
-        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-          <div className="text-sm text-blue-800 dark:text-blue-200">
-            <div className="font-medium mb-1">☁️ Cross-Device Sync</div>
-            <div className="text-xs text-blue-700 dark:text-blue-300">
-              Game format and period length are now synced across all your devices automatically.
-            </div>
-          </div>
-        </div>
-
         {/* Teams */}
         <div className="mb-6">
           <h3 className="font-semibold mb-2">Teams</h3>

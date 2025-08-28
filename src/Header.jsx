@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { BasketballIcon, LogOutIcon, ChartIcon, SunIcon, MoonIcon, EyeIcon, UserIcon, SlidersIcon, FilterIcon } from "./icons";
-import FilterDropdown from "./FilterDropdown";
+import { BasketballIcon, LogOutIcon, ChartIcon, EyeIcon, UserIcon, SlidersIcon, FilterIcon } from "./icons";
+import SyncStatusIndicator from "./components/SyncStatusIndicator";
+import { OfflineStorage } from "./utils/offlineUtils";
 
 // Blinking dot for Live indicator
 const BlinkingDot = ({ active }) => (
@@ -17,33 +18,65 @@ const BlinkingDot = ({ active }) => (
   ></span>
 );
 
+// WiFi icons for online/offline status
+const WiFiOnIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+  </svg>
+);
 
+const WiFiOffIcon = ({ className = "" }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M8.5 8.5a5 5 0 017 0M5 12.5a9 9 0 0114 0M12 21l0-8.5m-7-2.5a13 13 0 0114 0" />
+  </svg>
+);
+
+// Sync icon
+const SyncIcon = ({ className = "", spinning = false }) => (
+  <svg className={`${className} ${spinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
 
 export default function Header({
   user,
   onSignOut,
   setPage,
   theme,
+  toggleTheme,
   page,
   liveGameId,
   goToLiveGame,
   openSettingsModal,
   onSignIn,
   isUserAdmin = false,
+  isOnline = true,
+  onManualSync,
+  syncInProgress = false,
 }) {
+  const [pendingCount, setPendingCount] = useState(0);
   const hasLive = !!liveGameId;
+
+  // Update pending count
+  useEffect(() => {
+    const updateCount = () => {
+      setPendingCount(OfflineStorage.getPendingCount());
+    };
+    
+    updateCount();
+    const interval = setInterval(updateCount, 2000); // Update every 2 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   // Clean header that blends seamlessly
   const getHeaderBgColor = () => {
+    if (!isOnline) {
+      return "bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800";
+    }
     if (isUserAdmin) {
       return "bg-gray-100 dark:bg-gray-900"; // Match the main app background
     }
     return "bg-slate-50/80 dark:bg-slate-800/80"; 
-  };
-
-  // Remove admin glow effect
-  const getContainerStyles = () => {
-    return {};
   };
 
   // Live indicator click handler
@@ -98,14 +131,19 @@ export default function Header({
     setPage("game_setup");
   };
 
+  // Handle sync button click
+  const handleSyncClick = () => {
+    if (!isUserAdmin || syncInProgress || pendingCount === 0) return;
+    onManualSync();
+  };
+
   return (
     <header 
       className={`${getHeaderBgColor()} backdrop-blur-sm sticky top-0 z-20 transition-all duration-500`}
-      style={getContainerStyles()}
     >
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
         <div className="flex items-center justify-between">
-          {/* Left: Logo and Live Button */}
+          {/* Left: Logo, Live Button, and Status Indicators */}
           <div className="flex items-center gap-3">
             <div
               className={`flex items-center gap-2 cursor-pointer group relative ${
@@ -136,12 +174,50 @@ export default function Header({
                 </span>
               </div>
             </div>
+
+            {/* Live Game Indicator */}
             {LiveIndicator}
+
+            {/* WiFi Status Indicator - Match Live indicator styling */}
+            <div className={`flex items-center gap-1 px-3 py-1.5 font-semibold text-sm rounded-full transition-all ${
+              isOnline 
+                ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 shadow-md'
+                : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 shadow-md'
+            }`}>
+              {isOnline ? (
+                <WiFiOnIcon className="w-3 h-3" />
+              ) : (
+                <WiFiOffIcon className="w-3 h-3" />
+              )}
+              <span className="font-bold tracking-wide">
+                {isOnline ? "ONLINE" : "OFFLINE"}
+              </span>
+              {!isOnline && pendingCount > 0 && (
+                <span className="bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-bold ml-1">
+                  {pendingCount}
+                </span>
+              )}
+            </div>
+
+            {/* Sync Indicator for Online Pending Items */}
+            {isOnline && pendingCount > 0 && isUserAdmin && (
+              <button
+                onClick={handleSyncClick}
+                disabled={syncInProgress}
+                className="flex items-center gap-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/40 text-blue-700 dark:text-blue-300 rounded-full text-xs transition-colors disabled:opacity-50"
+                title={`${pendingCount} items ready to sync`}
+              >
+                <SyncIcon className="w-3 h-3" spinning={syncInProgress} />
+                <span className="hidden sm:inline">
+                  {syncInProgress ? "Syncing..." : `${pendingCount} pending`}
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Right: Controls - Settings, Dashboard, Sign Out/In */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Settings Button - Option 4 styling */}
+            {/* Settings Button - Enhanced styling for admins */}
             <button
               onClick={handleSettingsClick}
               disabled={!isUserAdmin}
@@ -167,6 +243,19 @@ export default function Header({
             >
               <ChartIcon className="h-5 w-5" />
             </button>
+
+            {/* Sync Status Indicator - Compact version for header */}
+            {isUserAdmin && (
+              <div className="hidden lg:block">
+                <SyncStatusIndicator 
+                  isOnline={isOnline} 
+                  user={user} 
+                  size="xs" 
+                  showText={false}
+                  onClick={!syncInProgress && pendingCount > 0 ? handleSyncClick : undefined}
+                />
+              </div>
+            )}
 
             {/* Sign Out/Sign In Button - Enhanced for admins */}
             {user && !user.isAnonymous ? (
@@ -194,6 +283,20 @@ export default function Header({
             )}
           </div>
         </div>
+
+        {/* Secondary row for mobile sync status */}
+        {!isOnline && isUserAdmin && pendingCount > 0 && (
+          <div className="mt-2 lg:hidden flex justify-center">
+            <button
+              onClick={handleSyncClick}
+              disabled={syncInProgress}
+              className="flex items-center gap-2 px-3 py-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-yellow-900 rounded-full text-xs font-medium transition-colors"
+            >
+              <SyncIcon className="w-3 h-3" spinning={syncInProgress} />
+              {syncInProgress ? "Syncing..." : `Sync ${pendingCount} items`}
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
