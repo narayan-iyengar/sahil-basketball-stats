@@ -69,6 +69,28 @@ const ExpandableBar = ({ isExpanded, className = "" }) => (
   <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
 );
 
+// Offline status badge for games
+const OfflineStatusBadge = ({ game }) => {
+  if (game.isOffline || game.tempId) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full font-medium" title="Saved offline, will sync when online">
+        <OfflineIcon className="w-3 h-3" />
+        <span className="hidden sm:inline">Offline</span>
+      </span>
+    );
+  }
+  
+  if (game.isOfflineUpdated) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full font-medium" title="Updated offline, will sync when online">
+        <CloudSyncIcon className="w-3 h-3" />
+        <span className="hidden sm:inline">Updated</span>
+      </span>
+    );
+  }
+  
+  return null;
+};
 
 // Card for stat values - now with editing capability
 const StatCard = ({ label, value, onClick, clickable, onEdit, editable, isEditing, editValue, onEditChange, onSave, onCancel, gameId }) => (
@@ -251,6 +273,8 @@ export default function Dashboard({
       .slice(0, 7);
   }, [allOpponents, searchTerm]);
 
+  // Count offline/pending games
+  const offlineGamesCount = (stats || []).filter(game => game.isOffline || game.tempId || game.isOfflineUpdated).length;
 
   // Aggregate stats - excluding offline/temp games from calculations
   const aggregatedStats = (stats || [])
