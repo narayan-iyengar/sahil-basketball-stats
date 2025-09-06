@@ -11,7 +11,7 @@ const ExpandableBar = ({ isExpanded, className = "" }) => (
   <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
 );
 
-export default function LiveGameAdmin({ db, gameId, user, onEndGame, isOnline }) {
+export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
   const [game, setGame] = useState(null);
   const [shareMessage, setShareMessage] = useState("");
   const [statsCollapsed, setStatsCollapsed] = useState(false);
@@ -27,7 +27,6 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame, isOnline })
   const [displayClockTenths, setDisplayClockTenths] = useState(0); // For tenths of seconds
   const displayInterval = useRef(null);
   const lastPeriodRef = useRef(null);
-
 
   // --- Listen to game state from Firestore ---
   useEffect(() => {
@@ -134,8 +133,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame, isOnline })
     }
   };
 
-  // --- Score handlers
-  /*
+  // --- Score handlers (simplified without offline support)
   const handleScoreChange = (team, delta) => {
     if (!game) return;
     const key = team === "home" ? "homeScore" : "awayScore";
@@ -154,38 +152,8 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame, isOnline })
     const updatePromise = updateDoc(doc(db, "liveGames", gameId), updates);
     showSaveIndicator(updatePromise);
   };
-  */
- // In LiveGameAdmin.jsx - update score and stat handlers:
 
-const handleScoreChange = (team, delta) => {
-  if (!game) return;
-  const key = team === "home" ? "homeScore" : "awayScore";
-  if (delta < 0 && game[key] <= 0) return;
-  
-  const updates = { [key]: increment(delta) };
-  
-  if (!game.isRunning) {
-    const now = Date.now();
-    updates.isRunning = true;
-    updates.clockStartTime = now;
-    updates.clockAtStart = game.clock || (game.periodLength * 60);
-  }
-  
-  let updatePromise;
-  if (isOnline) {
-    updatePromise = updateDoc(doc(db, "liveGames", gameId), updates);
-  } else {
-    // Save offline
-    OfflineStorage.savePendingLiveUpdate(gameId, updates);
-    updatePromise = Promise.resolve();
-    // Update local state immediately for responsive UI
-    setGame(prev => ({ ...prev, [key]: prev[key] + delta }));
-  }
-  
-  showSaveIndicator(updatePromise);
-};
-
-  // --- Stat handlers
+  // --- Stat handlers (simplified without offline support)
   const handleStatChange = (stat, delta) => {
     const gameRef = doc(db, "liveGames", gameId);
     const currentStats = game.playerStats;
@@ -232,6 +200,7 @@ const handleScoreChange = (team, delta) => {
       setSaveStatus("success");
     } catch (error) {
       setSaveStatus("error");
+      console.error("Save error:", error);
     } finally {
       setTimeout(() => {
         setSaveStatus(null);
@@ -239,7 +208,7 @@ const handleScoreChange = (team, delta) => {
     }
   };
 
-  // --- Start/Pause button logic
+  // --- Start/Pause button logic (simplified)
   const toggleClock = () => {
     if (!game) return;
     
@@ -269,7 +238,7 @@ const handleScoreChange = (team, delta) => {
     showSaveIndicator(updatePromise);
   };
 
-  // --- Manual advance period (for manual control) ---
+  // --- Manual advance period (simplified)
   const handleManualAdvance = () => {
     const gameRef = doc(db, "liveGames", gameId);
     const isHalves = game.gameFormat === "halves";
@@ -289,9 +258,7 @@ const handleScoreChange = (team, delta) => {
     }         
   };
 
-
-
-  // --- Share logic
+  // --- Share logic (simplified)
   const handleShare = () => {
     const shareableLink = `${window.location.origin}${window.location.pathname}?liveGameId=${gameId}`;
     navigator.clipboard.writeText(shareableLink);
@@ -331,12 +298,12 @@ const handleScoreChange = (team, delta) => {
   const clockIsRed = displayClock <= 120 || (atFinalPeriod && displayClock === 0);
   const clockIsUrgent = displayClock <= 60 && displayClock > 0;
 
-
   //Font Size
   const maxNameLength = Math.max(
-  game.teamName?.length || 1, 
-  game.opponent?.length || 1
-);
+    game.teamName?.length || 1, 
+    game.opponent?.length || 1
+  );
+
   return (
     <div className="h-screen flex flex-col">
       {/* Game ended notification */}
@@ -351,7 +318,8 @@ const handleScoreChange = (team, delta) => {
         <div className="w-full max-w-md mx-auto p-4">
           <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 relative">
             <div className="absolute top-2 right-2"><SaveStatusIndicator status={saveStatus} /></div>
-{/* Clock Section - Centered with better period/half label */}
+
+            {/* Clock Section - Centered with better period/half label */}
             <div className="flex justify-center items-center text-center mb-4 text-gray-900 dark:text-white">
               <div className="flex flex-col items-center justify-center">
                 <span className={`text-4xl font-mono tracking-wider transition-all duration-300 ${
@@ -431,8 +399,10 @@ const handleScoreChange = (team, delta) => {
                 </div>
               </div>
             </div>
-</div>
-  </div>
+          </div>
+        </div>
+      </div>
+
       {/* Scrollable Stats Section */}
       <div className="flex-1 overflow-y-auto">
         <div className="w-full max-w-md mx-auto p-4">
@@ -478,19 +448,13 @@ const handleScoreChange = (team, delta) => {
       <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-50">
         <div className="w-full max-w-md mx-auto p-3">
           <div className="grid grid-cols-3 gap-3">
-<button 
-  onClick={isOnline ? handleShare : null}
-  disabled={!isOnline}
-  className={`w-full py-3 rounded-lg font-bold text-lg flex items-center justify-center ${
-    isOnline 
-      ? 'bg-blue-600 hover:bg-blue-700 text-white'
-      : 'bg-gray-400 text-gray-600 cursor-not-allowed'
-  }`}
-  title={isOnline ? "Share live game link" : "Share unavailable offline"}
->
-  {shareMessage ? shareMessage : <ShareIcon />}
-  {!isOnline && <span className="ml-2 text-sm">(Offline)</span>}
-</button>
+            <button 
+              onClick={handleShare}
+              className="w-full py-3 rounded-lg font-bold text-lg flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white"
+              title="Share live game link"
+            >
+              {shareMessage ? shareMessage : <ShareIcon />}
+            </button>
             <button
               onClick={toggleClock}
               className={`w-full py-3 rounded-lg font-bold text-lg ${game.isRunning ? "bg-yellow-500 text-black" : "bg-green-500 text-white"}`}
@@ -515,10 +479,9 @@ const handleScoreChange = (team, delta) => {
             >
               {endButtonLabel}
             </button>
-           </div>
+          </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }

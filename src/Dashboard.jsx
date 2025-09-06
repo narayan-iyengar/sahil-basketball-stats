@@ -63,27 +63,6 @@ const CheckIcon = ({ className = "" }) => (
   </svg>
 );
 
-// Cloud sync icon for offline indicators
-const CloudSyncIcon = ({ className = "" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-  </svg>
-);
-
-// Offline icon
-const OfflineIcon = ({ className = "" }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m6 0l-3-3m3 3l-3 3" />
-  </svg>
-);
-
-// Sync icon
-const SyncIcon = ({ className = "", spinning = false }) => (
-  <svg className={`${className} ${spinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-  </svg>
-);
 
 // Expandable bar icon
 const ExpandableBar = ({ isExpanded, className = "" }) => (
@@ -226,9 +205,6 @@ export default function Dashboard({
   onAddTeam,
   externalFilters = {},
   isUserAdmin = false,
-  isOnline = true,
-  onManualSync,
-  syncInProgress = false,
 }) {
   const [newTeamName, setNewTeamName] = useState("");
   const [graphData, setGraphData] = useState(null);

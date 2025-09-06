@@ -13,10 +13,6 @@ import LiveGameViewer from "./LiveGameViewer";
 import StatEntry from "./StatEntry";
 import SettingsModal from "./SettingsModal";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
-import { useNetworkStatus } from "./hooks/useNetworkStatus";
-import { OfflineStorage } from "./utils/offlineUtils";
-import { SyncService } from "./services/syncService";
-import SyncStatusIndicator from "./components/SyncStatusIndicator";
 
 // Import admin utilities
 import { 
@@ -58,86 +54,6 @@ export default function App() {
   const [globalPeriodLength, setGlobalPeriodLength] = useState(20);
   const [globalNumPeriods, setGlobalNumPeriods] = useState(2);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-
-  // Offline & Sync
-  const { isOnline, wasOffline } = useNetworkStatus();
-  const [syncInProgress, setSyncInProgress] = useState(false);
-  const [lastSyncAttempt, setLastSyncAttempt] = useState(null);
-  const [syncResults, setSyncResults] = useState(null);
-  
-  // Auto-sync when coming back online
-  useEffect(() => {
-    if (isOnline && wasOffline && user && !syncInProgress) {
-      const pendingCount = OfflineStorage.getPendingCount();
-      if (pendingCount > 0) {
-        console.log(`Coming back online with ${pendingCount} pending items`);
-        autoSync();
-      }
-    }
-  }, [isOnline, wasOffline, user, syncInProgress]);
-
-  // Auto-sync function
-  const autoSync = useCallback(async () => {
-    if (!user || syncInProgress) return;
-    
-    setSyncInProgress(true);
-    setLastSyncAttempt(Date.now());
-    
-    try {
-      const result = await SyncService.syncAllOfflineData(user);
-      console.log("Auto-sync result:", result);
-      setSyncResults(result);
-      
-      if (result.success) {
-        // Refresh data after successful sync
-        const gamesCol = collection(db, "games");
-        const snap = await getDocs(gamesCol);
-        setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      }
-    } catch (error) {
-      console.error("Auto-sync failed:", error);
-    } finally {
-      setSyncInProgress(false);
-    }
-  }, [user, syncInProgress]);
-
-  // Manual sync function for UI
-  const handleManualSync = useCallback(async () => {
-    if (!user || syncInProgress) return;
-    
-    setSyncInProgress(true);
-    setLastSyncAttempt(Date.now());
-    
-    try {
-      const result = await SyncService.forceSyncNow(user);
-      console.log("Manual sync result:", result);
-      setSyncResults(result);
-      
-      if (result.success && result.results) {
-        // Show success message
-        const { games: gameResults, updates: updateResults } = result.results;
-        const totalSynced = gameResults.synced + updateResults.synced;
-        
-        if (totalSynced > 0) {
-          alert(`Successfully synced ${totalSynced} items!`);
-          
-          // Refresh data
-          const gamesCol = collection(db, "games");
-          const snap = await getDocs(gamesCol);
-          setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } else {
-          alert("No items to sync.");
-        }
-      } else if (result.error) {
-        alert(`Sync failed: ${result.message}`);
-      }
-    } catch (error) {
-      console.error("Manual sync failed:", error);
-      alert("Sync failed. Please try again.");
-    } finally {
-      setSyncInProgress(false);
-    }
-  }, [user, syncInProgress]);
 
   // --- AUTH LOGIC WITH SETTINGS LOADING ---
   useEffect(() => {
@@ -222,18 +138,12 @@ export default function App() {
     const teamsCol = collection(db, "teams");
     const unsub = onSnapshot(teamsCol, (snap) => {
       setTeams(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      // Cache teams for offline use
-      OfflineStorage.cacheData('teams', snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, (error) => {
       console.error("Error loading teams:", error);
-      // Load from cache if offline
-      if (!isOnline) {
-        const cachedTeams = OfflineStorage.getCachedData('teams') || [];
-        setTeams(cachedTeams);
-      }
+      alert("Error loading teams. Please check your internet connection.");
     });
     return unsub;
-  }, [user, isOnline]);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -241,18 +151,12 @@ export default function App() {
     const unsub = onSnapshot(gamesCol, (snap) => {
       const gamesArr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setGames(gamesArr);
-      // Cache games for offline use
-      OfflineStorage.cacheData('games', gamesArr);
     }, (error) => {
       console.error("Error loading games:", error);
-      // Load from cache if offline
-      if (!isOnline) {
-        const cachedGames = OfflineStorage.getCachedData('games') || [];
-        setGames(cachedGames);
-      }
+      alert("Error loading games. Please check your internet connection.");
     });
     return unsub;
-  }, [user, isOnline]);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -260,18 +164,12 @@ export default function App() {
     const unsub = onSnapshot(statsCol, (snap) => {
       const statsArr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setStats(statsArr);
-      // Cache stats for offline use
-      OfflineStorage.cacheData('stats', statsArr);
     }, (error) => {
       console.error("Error loading stats:", error);
-      // Load from cache if offline
-      if (!isOnline) {
-        const cachedStats = OfflineStorage.getCachedData('stats') || [];
-        setStats(cachedStats);
-      }
+      alert("Error loading stats. Please check your internet connection.");
     });
     return unsub;
-  }, [user, isOnline]);
+  }, [user]);
 
   // --- LIVE GAME ID TRACKER ---
   useEffect(() => {
@@ -306,14 +204,7 @@ export default function App() {
     }
     
     try {
-      if (isOnline) {
-        await updateDoc(doc(db, "games", gameId), { photos });
-      } else {
-        // Store update for later sync
-        OfflineStorage.savePendingUpdate(gameId, { photos });
-        alert("Photo update saved offline. Will sync when online.");
-      }
-      
+      await updateDoc(doc(db, "games", gameId), { photos });
       setGames((games) => 
         games.map((game) => 
           game.id === gameId ? { ...game, photos } : game
@@ -321,6 +212,7 @@ export default function App() {
       );
     } catch (error) {
       console.error("Error updating game photos:", error);
+      alert("Failed to update photos. Please check your internet connection and try again.");
     }
   };
 
@@ -330,14 +222,15 @@ export default function App() {
       return;
     }
     
-    if (!isOnline) {
-      alert("Cannot delete items while offline. Please try again when online.");
-      return;
+    try {
+      await deleteDoc(doc(db, "teams", teamId));
+      console.log("Team deleted:", teamId);
+      // Don't manually update state - let Firebase listener handle it
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      alert("Failed to delete team. Please check your internet connection and try again.");
     }
-    
-    await deleteDoc(doc(db, "teams", teamId));
-    setTeams((teams) => teams.filter((t) => t.id !== teamId));
-  }, [user, isOnline]);
+  }, [user]);
 
   const handleAddTeam = async (teamName) => {
     if (!canWrite(user)) {
@@ -349,17 +242,15 @@ export default function App() {
     if (exists) return null;
     
     try {
-      if (isOnline) {
-        const docRef = await addDoc(collection(db, "teams"), { name: teamName });
-        setTeams((t) => [...t, { name: teamName, id: docRef.id }]);
-        return { name: teamName, id: docRef.id };
-      } else {
-        alert("Cannot add teams while offline. Please try again when online.");
-        return null;
-      }
+      const docRef = await addDoc(collection(db, "teams"), { name: teamName });
+      console.log("Team added with ID:", docRef.id);
+      
+      // Don't manually update state - let Firebase listener handle it
+      // Return the team data for components that need immediate feedback
+      return { name: teamName, id: docRef.id };
     } catch (error) {
       console.error("Error adding team:", error);
-      alert("Failed to add team. Please try again.");
+      alert("Failed to add team. Please check your internet connection and try again.");
       return null;
     }
   };
@@ -371,19 +262,16 @@ export default function App() {
     }
     
     try {
-      if (isOnline) {
-        const docRef = await addDoc(collection(db, "games"), game);
-        setGames((g) => [...g, { ...game, id: docRef.id }]);
-      } else {
-        alert("Cannot add games while offline. Please try again when online.");
-      }
+      const docRef = await addDoc(collection(db, "games"), game);
+      console.log("Game added with ID:", docRef.id);
+      // Don't manually update state - let Firebase listener handle it
     } catch (error) {
       console.error("Error adding game:", error);
-      alert("Failed to add game. Please try again.");
+      alert("Failed to add game. Please check your internet connection and try again.");
     }
-  }, [user, isOnline]);
+  }, [user]);
 
-  // Enhanced handleAddStat with offline support
+  // Simplified handleAddStat without offline support
   const handleAddStat = useCallback(async (stat) => {
     if (!canWrite(user)) {
       showAccessDenied('add statistics');
@@ -407,32 +295,19 @@ export default function App() {
     };
 
     try {
-      if (isOnline) {
-        // Try online first
-        const docRef = await addDoc(collection(db, "games"), gameRecord);
-        setGames((g) => [...g, { ...gameRecord, id: docRef.id }]);
-        console.log("Game saved online:", docRef.id);
-      } else {
-        throw new Error("Offline mode");
-      }
-    } catch (error) {
-      console.log("Saving offline:", error.message);
-      // Save offline
-      const tempId = OfflineStorage.savePendingGame(gameRecord);
-      setGames((g) => [...g, { 
-        ...gameRecord, 
-        id: tempId, 
-        isOffline: true,
-        tempId: tempId 
-      }]);
+      const docRef = await addDoc(collection(db, "games"), gameRecord);
+      console.log("Game saved with ID:", docRef.id);
       
-      // Show user feedback
-      alert(`Game saved offline. Will sync when connection is restored.`);
+      // Don't manually update state - let Firebase listener handle it
+      // The onSnapshot listener will automatically update the games state
+      
+      setCurrentGameConfig(null);
+      setPage("dashboard");
+    } catch (error) {
+      console.error("Error saving game:", error);
+      alert("Failed to save game. Please check your internet connection and try again.");
     }
-    
-    setCurrentGameConfig(null);
-    setPage("dashboard");
-  }, [currentGameConfig, user, isOnline]);
+  }, [currentGameConfig, user]);
 
   const handleDeleteGame = useCallback(async (gameId) => {
     if (!canDelete(user)) {
@@ -440,23 +315,15 @@ export default function App() {
       return;
     }
     
-    if (!isOnline) {
-      alert("Cannot delete items while offline. Please try again when online.");
-      return;
+    try {
+      await deleteDoc(doc(db, "games", gameId));
+      console.log("Game deleted:", gameId);
+      // Don't manually update state - let Firebase listener handle it
+    } catch (error) {
+      console.error("Error deleting game:", error);
+      alert("Failed to delete game. Please check your internet connection and try again.");
     }
-    
-    // Check if it's a temp offline game
-    if (gameId.startsWith('temp_')) {
-      // Remove from offline storage
-      OfflineStorage.removePendingGame(gameId);
-      setGames((g) => g.filter((x) => x.id !== gameId));
-      return;
-    }
-    
-    await deleteDoc(doc(db, "games", gameId));
-    setGames((g) => g.filter((x) => x.id !== gameId));
-    setStats((s) => s.filter((x) => x.gameId !== gameId));
-  }, [user, isOnline]);
+  }, [user]);
 
   const handleUpdateGame = useCallback(async (gameId, updates) => {
     if (!canWrite(user)) {
@@ -477,36 +344,26 @@ export default function App() {
       updates.editedAt = new Date().toISOString();
       updates.editedBy = user?.displayName ? user.displayName.split(" ")[0] : "";
       
-      if (isOnline) {
-        await updateDoc(doc(db, "games", gameId), updates);
-      } else {
-        // Store update for later sync
-        OfflineStorage.savePendingUpdate(gameId, updates);
-        alert("Changes saved offline. Will sync when online.");
-      }
+      await updateDoc(doc(db, "games", gameId), updates);
       
       // Update local state
       setGames((games) => 
         games.map((game) => 
-          game.id === gameId ? { ...game, ...updates, isOfflineUpdated: !isOnline } : game
+          game.id === gameId ? { ...game, ...updates } : game
         )
       );
       
     } catch (error) {
       console.error("Error updating game:", error);
+      alert("Failed to update game. Please check your internet connection and try again.");
       throw error;
     }
-  }, [user, isOnline]);
+  }, [user]);
 
   // --- END GAME LOGIC ---
   const handleEndGame = async (liveGameId) => {
     if (!canManageLiveGames(user)) {
       showAccessDenied('manage live games');
-      return;
-    }
-    
-    if (!isOnline) {
-      alert("Cannot end games while offline. Please try again when online.");
       return;
     }
     
@@ -564,6 +421,7 @@ export default function App() {
       setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.error("Failed to save/end game:", err);
+      alert("Failed to end game. Please check your internet connection and try again.");
     }
   };
 
@@ -574,16 +432,16 @@ export default function App() {
       return;
     }
     
-    if (!isOnline) {
-      alert("Cannot delete live games while offline. Please try again when online.");
-      return;
+    try {
+      const snapshot = await getDocs(collection(db, "liveGames"));
+      for (let gameDoc of snapshot.docs) {
+        await deleteDoc(doc(db, "liveGames", gameDoc.id));
+      }
+      setLiveGameId(null);
+    } catch (error) {
+      console.error("Error deleting live games:", error);
+      alert("Failed to delete live games. Please check your internet connection and try again.");
     }
-    
-    const snapshot = await getDocs(collection(db, "liveGames"));
-    for (let gameDoc of snapshot.docs) {
-      await deleteDoc(doc(db, "liveGames", gameDoc.id));
-    }
-    setLiveGameId(null);
   };
 
   // --- NAV HELPERS ---
@@ -635,11 +493,6 @@ export default function App() {
       return;
     }
     
-    //if (!isOnline && mode === "live") {
-    //  alert("Live games require an internet connection to share with viewers. You can still create a regular game and enter stats offline.");
-    //  return;
-    //}
-    
     const newGame = {
       ...config,
       createdBy: user?.uid || null,
@@ -661,7 +514,7 @@ export default function App() {
       periodLength: globalPeriodLength || 20,
       numPeriods: globalGameFormat === "halves" ? 2 : 4,
     };
-    /*
+
     if (mode === "live") {
       if (!canManageLiveGames(user)) {
         showAccessDenied('start live games');
@@ -673,30 +526,12 @@ export default function App() {
         setPage("live_admin");
       } catch (error) {
         console.error("Error creating live game:", error);
-        alert("Failed to create live game. Please check your connection and try again.");
+        alert("Failed to create live game. Please check your internet connection and try again.");
       }
     } else {
       setCurrentGameConfig(newGame);
       setPage("add_stat");
     }
-    */
-if (mode === "live") {
-  if (!canManageLiveGames(user)) {
-    showAccessDenied('start live games');
-    return;
-  }
-  try {
-    const docRef = await addDoc(collection(db, "liveGames"), newGame);
-    setLiveGameId(docRef.id);
-    setPage("live_admin");
-  } catch (error) {
-    // If offline, create local live game
-    const tempId = `temp_live_${Date.now()}`;
-    setLiveGameId(tempId);
-    setPage("live_admin");
-    console.log("Created offline live game");
-  }
-}
   };
 
   // Settings modal handler
@@ -737,9 +572,6 @@ if (mode === "live") {
             openSettingsModal={openSettingsModal}
             onSignIn={handleSignIn}
             isUserAdmin={false}
-            isOnline={isOnline}
-            onManualSync={handleManualSync}
-            syncInProgress={syncInProgress}
           />
           <main className="flex-1">
             <LiveGameViewer
@@ -770,9 +602,6 @@ if (mode === "live") {
             onDeleteAllLiveGames={handleDeleteAllLiveGames}
             openSettingsModal={openSettingsModal}
             isUserAdmin={false}
-            isOnline={isOnline}
-            onManualSync={handleManualSync}
-            syncInProgress={syncInProgress}
           />
           <main className="flex-1 flex items-center justify-center">
             <div className="text-2xl text-gray-400 text-center">
@@ -806,9 +635,6 @@ if (mode === "live") {
           onDeleteAllLiveGames={handleDeleteAllLiveGames}
           openSettingsModal={openSettingsModal}
           isUserAdmin={isUserAdmin}
-          isOnline={isOnline}
-          onManualSync={handleManualSync}
-          syncInProgress={syncInProgress}
         />
         <main className="flex-1 flex items-center justify-center">
           <div className="max-w-md mx-auto text-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
@@ -847,36 +673,7 @@ if (mode === "live") {
         onDeleteAllLiveGames={handleDeleteAllLiveGames}
         openSettingsModal={openSettingsModal}
         isUserAdmin={isUserAdmin}
-        isOnline={isOnline}
-        onManualSync={handleManualSync}
-        syncInProgress={syncInProgress}
       />
-      
-      
-      
-      {/* Offline Banner Code */}
-      
-      {/*  
-      {!isOnline && (
-        <div className="bg-yellow-100 dark:bg-yellow-900 border-b border-yellow-400 dark:border-yellow-600 text-yellow-800 dark:text-yellow-200 px-4 py-2 text-center text-sm">
-          <div className="flex items-center justify-center gap-2">
-            <span>📡 Offline Mode</span>
-            {OfflineStorage.getPendingCount() > 0 && (
-              <span>• {OfflineStorage.getPendingCount()} items will sync when online</span>
-            )}
-            {isUserAdmin && OfflineStorage.getPendingCount() > 0 && (
-              <button
-                onClick={handleManualSync}
-                disabled={syncInProgress}
-                className="ml-2 px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-yellow-900 rounded text-xs disabled:opacity-50"
-              >
-                {syncInProgress ? "Syncing..." : "Sync Now"}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      */}
       
       <SettingsModal
         open={settingsOpen}
@@ -892,10 +689,6 @@ if (mode === "live") {
         toggleTheme={toggleTheme}
         setPage={setPage}
         onDeleteAllLiveGames={handleDeleteAllLiveGames}
-        isOnline={isOnline}
-        pendingCount={OfflineStorage.getPendingCount()}
-        onManualSync={handleManualSync}
-        syncInProgress={syncInProgress}
         isUserAdmin={isUserAdmin}
       />
       
@@ -914,7 +707,6 @@ if (mode === "live") {
             gameFormat={globalGameFormat}
             periodLength={globalPeriodLength}
             numPeriods={globalNumPeriods}
-            isOnline={isOnline}
           />
         )}
         
@@ -922,7 +714,6 @@ if (mode === "live") {
           <Dashboard
             user={user}
             teams={teams}
-            games={games}
             stats={games}
             onDeleteGame={handleDeleteGame}
             onDeleteTeam={handleDeleteTeam}
@@ -930,9 +721,6 @@ if (mode === "live") {
             onUpdateGamePhotos={handleUpdateGamePhotos}
             onUpdateGame={handleUpdateGame}
             isUserAdmin={isUserAdmin}
-            isOnline={isOnline}
-            onManualSync={handleManualSync}
-            syncInProgress={syncInProgress}
           />
         )}
         
@@ -945,7 +733,6 @@ if (mode === "live") {
               setCurrentGameConfig(null);
               setPage("game_setup");
             }}
-            isOnline={isOnline}
           />
         )}
         
@@ -959,7 +746,6 @@ if (mode === "live") {
             stats={stats}
             games={games}
             onEndGame={handleEndGame}
-            isOnline={isOnline}
           />
         )}
         

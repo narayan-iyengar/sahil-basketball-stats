@@ -17,7 +17,7 @@ const GPSIcon = ({ className = "" }) => (
   </svg>
 );
 
-export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline = true }) {
+export default function GameSetup({ teams = [], stats = [], onSubmit, onAddTeam }) {
   const [config, setConfig] = useState({
     teamName: "",
     opponent: "",
@@ -34,7 +34,8 @@ export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline =
   });
   const [error, setError] = useState("");
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [useManualTeamEntry, setUseManualTeamEntry] = useState(!isOnline);
+  const [showAddTeamInput, setShowAddTeamInput] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
   
   const uniqueTeams = useMemo(() => {
     // De-dupe by id and name (just in case)
@@ -58,19 +59,35 @@ export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline =
     return [...locationSet].sort();
   }, [stats]);
 
-  // Set default team when online and teams are available
+  // Set default team when teams are available
   useEffect(() => {
-    if (isOnline && uniqueTeams.length > 0 && !config.teamName && !useManualTeamEntry) {
+    if (uniqueTeams.length > 0 && !config.teamName) {
       setConfig((prev) => ({ ...prev, teamName: uniqueTeams[0].name }));
     }
-  }, [uniqueTeams, config.teamName, isOnline, useManualTeamEntry]);
+  }, [uniqueTeams, config.teamName]);
 
-  // Auto-switch to manual entry when offline
-  useEffect(() => {
-    if (!isOnline) {
-      setUseManualTeamEntry(true);
+  // Handle adding new team
+  const handleAddTeam = async () => {
+    if (!newTeamName.trim()) return;
+    
+    const exists = uniqueTeams.some((team) => team.name.toLowerCase() === newTeamName.toLowerCase());
+    if (exists) {
+      alert("Team already exists!");
+      return;
     }
-  }, [isOnline]);
+    
+    try {
+      const newTeam = await onAddTeam(newTeamName.trim());
+      if (newTeam) {
+        setConfig((prev) => ({ ...prev, teamName: newTeam.name }));
+        setNewTeamName("");
+        setShowAddTeamInput(false);
+      }
+    } catch (error) {
+      console.error("Error adding team:", error);
+      alert("Failed to add team. Please try again.");
+    }
+  };
 
   const handleOpponentChange = (e) => {
     const value = e.target.value;
@@ -124,11 +141,7 @@ export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline =
       },
       (error) => {
         console.error("Error getting location:", error);
-        if (!isOnline) {
-          alert("Unable to get your location while offline. Please enter manually.");
-        } else {
-          alert("Unable to get your location. Please enter manually.");
-        }
+        alert("Unable to get your location. Please enter manually.");
         setIsGettingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
@@ -161,67 +174,35 @@ export default function GameSetup({ teams = [], stats = [], onSubmit, isOnline =
     setConfig((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleTeamDropdownChange = (e) => {
+    const value = e.target.value;
+    
+    if (value === "__ADD_NEW_TEAM__") {
+      setShowAddTeamInput(true);
+      // Don't change the team selection, keep current value
+    } else {
+      setConfig((prev) => ({ ...prev, teamName: value }));
+    }
+  };
 
-  /*
   const handleSubmit = (mode) => {
     if (!config.teamName || !config.opponent) {
       setError("Please enter a team name and opponent name.");
       return;
     }
+    
     setError("");
-    const gameTimestamp = new Date(
-      `${config.date}T${config.time}`
-    ).toISOString();
+    const gameTimestamp = new Date(`${config.date}T${config.time}`).toISOString();
+    
     if (typeof onSubmit === "function") {
       onSubmit({ ...config, timestamp: gameTimestamp }, mode);
     } else {
       setError("Internal error: Game submit not available.");
     }
   };
-  */
-
-  //offline submit
-  // In GameSetup.jsx - update handleSubmit:
-
-const handleSubmit = (mode) => {
-  if (!config.teamName || !config.opponent) {
-    setError("Please enter a team name and opponent name.");
-    return;
-  }
-  
-  if (mode === "live" && !isOnline) {
-    // Allow offline live games but warn user
-    const confirmed = window.confirm(
-      "You're offline. This will create a live game that you can score locally. " +
-      "It will sync when you're back online. Continue?"
-    );
-    if (!confirmed) return;
-  }
-  
-  setError("");
-  const gameTimestamp = new Date(`${config.date}T${config.time}`).toISOString();
-  
-  if (typeof onSubmit === "function") {
-    onSubmit({ ...config, timestamp: gameTimestamp }, mode);
-  } else {
-    setError("Internal error: Game submit not available.");
-  }
-};
 
   return (
     <div className="max-w-xl mx-auto bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-      {/* Offline Notice */}
-      {!isOnline && (
-        <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <div className="text-sm text-yellow-800 dark:text-yellow-200">
-            <div className="font-medium mb-1">📱 Offline Mode</div>
-            <div className="text-xs text-yellow-700 dark:text-yellow-300">
-              You can create games offline, but live sharing requires an internet connection.
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header with centered date/time */}
       <div className="flex items-center justify-center mb-6">
         <div className="flex items-center gap-2">
@@ -249,42 +230,53 @@ const handleSubmit = (mode) => {
       )}
       <div className="space-y-6">
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Sahil's Team
-            </label>
-            {/* Toggle between dropdown and manual entry - only show when online */}
-            {isOnline && uniqueTeams.length > 0 && (
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Sahil's Team
+          </label>
+          
+          {showAddTeamInput ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Enter new team name"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+                className="flex-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddTeam();
+                  }
+                  if (e.key === 'Escape') {
+                    setShowAddTeamInput(false);
+                    setNewTeamName("");
+                  }
+                }}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleAddTeam}
+                disabled={!newTeamName.trim()}
+                className="px-4 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded font-medium"
+              >
+                Add
+              </button>
               <button
                 type="button"
                 onClick={() => {
-                  setUseManualTeamEntry(!useManualTeamEntry);
-                  setConfig(prev => ({ ...prev, teamName: "" }));
+                  setShowAddTeamInput(false);
+                  setNewTeamName("");
                 }}
-                className="text-xs text-blue-500 hover:text-blue-600 underline"
+                className="px-4 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded"
               >
-                {useManualTeamEntry ? "Choose from list" : "Enter manually"}
+                Cancel
               </button>
-            )}
-          </div>
-          
-          {useManualTeamEntry || !isOnline || uniqueTeams.length === 0 ? (
-            <input
-              type="text"
-              placeholder="Enter team name (e.g., Sahil's Team)"
-              value={config.teamName}
-              onChange={handleTeamNameChange}
-              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full"
-              required
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck="false"
-            />
+            </div>
           ) : (
             <select
               name="teamName"
               value={config.teamName}
-              onChange={handleChange}
+              onChange={handleTeamDropdownChange}
               className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-gray-300 dark:border-gray-600 rounded p-3 focus:ring-orange-500 focus:ring-2 outline-none w-full appearance-none"
             >
               <option value="" disabled>
@@ -295,6 +287,9 @@ const handleSubmit = (mode) => {
                   {team.name}
                 </option>
               ))}
+              <option value="__ADD_NEW_TEAM__" className="font-medium text-blue-600">
+                ➕ Add New Team...
+              </option>
             </select>
           )}
         </div>
@@ -315,8 +310,8 @@ const handleSubmit = (mode) => {
             autoCorrect="off"
             spellCheck="false"
           />
-          {/* Status indicators - only show when online */}
-          {isOnline && config.opponent && (
+          {/* Status indicators */}
+          {config.opponent && (
             <div className="mt-2 text-sm">
               {opponentExists ? (
                 <div className="flex items-center text-green-600 dark:text-green-400">
@@ -385,8 +380,8 @@ const handleSubmit = (mode) => {
             </button>
           </div>
           
-          {/* Location suggestions - only show when online */}
-          {isOnline && suggestedLocations.length > 0 && (
+          {/* Location suggestions */}
+          {suggestedLocations.length > 0 && (
             <div className="mt-2 text-sm">
               <div className="text-gray-600 dark:text-gray-400 mb-1">Previous locations:</div>
               <div className="flex flex-wrap gap-1">
@@ -416,24 +411,24 @@ const handleSubmit = (mode) => {
           )}
         </div>
         
-<div className="border-t border-gray-200 dark:border-gray-600 pt-6 space-y-4">
-  {/* Live Game Button - now works offline */}
-  <button
-    onClick={() => handleSubmit("live")}
-    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg"
-    title="Start Live Game & Track Stats"
-  >
-    Start Live Game & Track Stats
-  </button>
-  
-  {/* Regular Game Button - same as before */}
-  <button
-    onClick={() => handleSubmit("final")}
-    className="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg border border-gray-300 dark:border-gray-600"
-  >
-    Enter Final Stats Only
-  </button>
-</div>
+        <div className="border-t border-gray-200 dark:border-gray-600 pt-6 space-y-4">
+          {/* Live Game Button */}
+          <button
+            onClick={() => handleSubmit("live")}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg"
+            title="Start Live Game & Track Stats"
+          >
+            Start Live Game & Track Stats
+          </button>
+          
+          {/* Regular Game Button */}
+          <button
+            onClick={() => handleSubmit("final")}
+            className="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold py-3 px-4 rounded-lg transition duration-300 flex items-center justify-center text-lg border border-gray-300 dark:border-gray-600"
+          >
+            Enter Final Stats Only
+          </button>
+        </div>
       </div>
     </div>
   );
