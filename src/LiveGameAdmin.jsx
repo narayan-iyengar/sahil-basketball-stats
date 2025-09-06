@@ -6,6 +6,24 @@ import SaveStatusIndicator from "./SaveStatusIndicator";
 import { ShareIcon } from "./icons";
 import { db } from "./firebase";
 
+// Bench Icon - Person sitting on bench
+const BenchIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    {/* Person's head */}
+    <circle cx="8" cy="5" r="1.5" />
+    {/* Person's body */}
+    <rect x="6.5" y="7" width="3" height="3" rx="0.5" />
+    {/* Person's legs */}
+    <rect x="7" y="10" width="0.8" height="3" rx="0.4" />
+    <rect x="8.2" y="10" width="0.8" height="3" rx="0.4" />
+    {/* Bench seat */}
+    <rect x="3" y="9.5" width="14" height="1" rx="0.5" />
+    {/* Bench legs */}
+    <rect x="4" y="10.5" width="0.5" height="2" rx="0.25" />
+    <rect x="15.5" y="10.5" width="0.5" height="2" rx="0.25" />
+  </svg>
+);
+
 // Expandable bar icon
 const ExpandableBar = ({ isExpanded, className = "" }) => (
   <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
@@ -65,6 +83,23 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
       }
     };
   }, [db, gameId]);
+
+  // Sync bench status when stats are collapsed/expanded
+  useEffect(() => {
+    if (!game || !gameId) return;
+    
+    const updateBenchStatus = async () => {
+      try {
+        await updateDoc(doc(db, "liveGames", gameId), {
+          sahilOnBench: statsCollapsed
+        });
+      } catch (error) {
+        console.error("Error updating bench status:", error);
+      }
+    };
+    
+    updateBenchStatus();
+  }, [statsCollapsed, gameId]);
 
   // --- Display clock updater with auto-advance logic ---
   useEffect(() => {
@@ -153,7 +188,7 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
     showSaveIndicator(updatePromise);
   };
 
-  // --- Stat handlers (simplified without offline support)
+  // --- FIXED Stat handlers with corrected shooting logic ---
   const handleStatChange = (stat, delta) => {
     const gameRef = doc(db, "liveGames", gameId);
     const currentStats = game.playerStats;
@@ -180,13 +215,62 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
       if (stat === "ftm" && currentStats.ftm > 0) updates.homeScore = increment(-1);
     }
     
-    // Keep made <= att and vice versa
-    if (stat === "fg2m" && delta > 0 && newValue > currentStats.fg2a) updates["playerStats.fg2a"] = newValue;
-    if (stat === "fg2a" && delta < 0 && newValue < currentStats.fg2m) updates["playerStats.fg2m"] = newValue;
-    if (stat === "fg3m" && delta > 0 && newValue > currentStats.fg3a) updates["playerStats.fg3a"] = newValue;
-    if (stat === "fg3a" && delta < 0 && newValue < currentStats.fg3m) updates["playerStats.fg3m"] = newValue;
-    if (stat === "ftm" && delta > 0 && newValue > currentStats.fta) updates["playerStats.fta"] = newValue;
-    if (stat === "fta" && delta < 0 && newValue < currentStats.ftm) updates["playerStats.ftm"] = newValue;
+    // FIXED: Shot attempt logic
+    // For made shots - every increase/decrease in made should increase/decrease attempts
+    if (stat === "fg2m") {
+      if (delta > 0) {
+        // Increasing made shots - always increase attempts by the same amount
+        updates["playerStats.fg2a"] = currentStats.fg2a + delta;
+      } else if (delta < 0) {
+        // Decreasing made shots - decrease attempts but keep attempts >= made
+        updates["playerStats.fg2a"] = Math.max(newValue, currentStats.fg2a + delta);
+      }
+    }
+    
+    if (stat === "fg3m") {
+      if (delta > 0) {
+        // Increasing made shots - always increase attempts by the same amount
+        updates["playerStats.fg3a"] = currentStats.fg3a + delta;
+      } else if (delta < 0) {
+        // Decreasing made shots - decrease attempts but keep attempts >= made
+        updates["playerStats.fg3a"] = Math.max(newValue, currentStats.fg3a + delta);
+      }
+    }
+    
+    if (stat === "ftm") {
+      if (delta > 0) {
+        // Increasing made shots - always increase attempts by the same amount
+        updates["playerStats.fta"] = currentStats.fta + delta;
+      } else if (delta < 0) {
+        // Decreasing made shots - decrease attempts but keep attempts >= made
+        updates["playerStats.fta"] = Math.max(newValue, currentStats.fta + delta);
+      }
+    }
+    
+    // For attempt shots - ensure made <= attempts
+    if (stat === "fg2a") {
+      if (delta < 0) {
+        // Decreasing attempts - ensure made doesn't exceed attempts
+        updates["playerStats.fg2m"] = Math.min(currentStats.fg2m, newValue);
+      }
+      // When increasing attempts, no need to change made shots
+    }
+    
+    if (stat === "fg3a") {
+      if (delta < 0) {
+        // Decreasing attempts - ensure made doesn't exceed attempts
+        updates["playerStats.fg3m"] = Math.min(currentStats.fg3m, newValue);
+      }
+      // When increasing attempts, no need to change made shots
+    }
+    
+    if (stat === "fta") {
+      if (delta < 0) {
+        // Decreasing attempts - ensure made doesn't exceed attempts
+        updates["playerStats.ftm"] = Math.min(currentStats.ftm, newValue);
+      }
+      // When increasing attempts, no need to change made shots
+    }
 
     const updatePromise = updateDoc(gameRef, updates);
     showSaveIndicator(updatePromise);
@@ -407,16 +491,31 @@ export default function LiveGameAdmin({ db, gameId, user, onEndGame }) {
       <div className="flex-1 overflow-y-auto">
         <div className="w-full max-w-md mx-auto p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
-            {/* Collapsible Header */}
+            {/* Collapsible Header with Bench Status */}
             <div className="flex flex-col items-center p-4 border-b border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => setStatsCollapsed(!statsCollapsed)}
                 className="flex flex-col items-center gap-2 w-full"
               >
                 <ExpandableBar isExpanded={!statsCollapsed} />
-                <h3 className="text-lg font-bold text-orange-500">
-                  {statsCollapsed ? "Stats Collapsed" : "Live Stats"}
-                </h3>
+                <div className="flex items-center gap-2">
+                  {statsCollapsed ? (
+                    <>
+                      <BenchIcon className="w-5 h-5 text-orange-500" />
+                      <h3 className="text-lg font-bold text-orange-500">Sahil on Bench</h3>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-lg">🏀</span>
+                      <h3 className="text-lg font-bold text-orange-500">Live Stats</h3>
+                    </>
+                  )}
+                </div>
+                {statsCollapsed && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    Tap to expand when Sahil is back in the game
+                  </p>
+                )}
               </button>
             </div>
             

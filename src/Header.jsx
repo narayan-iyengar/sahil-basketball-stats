@@ -109,9 +109,7 @@ export default function Header({
           {/* Left: Logo, Live Button, and Status Indicators */}
           <div className="flex items-center gap-3">
             <div
-              className={`flex items-center gap-2 cursor-pointer group relative ${
-                isUserAdmin ? 'p-1 sm:p-3 rounded-lg sm:rounded-xl bg-white dark:bg-gray-800 shadow-lg sm:shadow-xl border border-orange-200 dark:border-orange-700 hover:shadow-xl sm:hover:shadow-2xl transition-all duration-300' : ''
-              }`}
+              className="flex items-center gap-2 cursor-pointer group"
               onClick={() => {
                 // Only admins can go to game setup, others go to dashboard
                 if (isUserAdmin) {
@@ -121,18 +119,12 @@ export default function Header({
                 }
               }}
             >
-              <div className={`flex items-center justify-center text-lg ${
-                isUserAdmin ? 'w-10 h-10' : ''
-              }`}>
-                <span className={`animate-spin-slow group-hover:scale-110 transition-transform duration-300 text-xl sm:text-2xl`}>🏀</span>
+              <div className="flex items-center justify-center text-lg">
+                <span className="animate-spin-slow group-hover:scale-110 transition-transform duration-300 text-xl sm:text-2xl">🏀</span>
               </div>
               
               <div className="hidden sm:flex flex-col">
-                <span className={`text-lg font-bold ${
-                  isUserAdmin 
-                    ? 'text-orange-600 dark:text-orange-400'
-                    : 'bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent'
-                }`}>
+                <span className="text-lg font-bold bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
                   Sahil's Stats
                 </span>
               </div>
@@ -142,15 +134,15 @@ export default function Header({
             {LiveIndicator}
           </div>
 
-          {/* Right: Controls - Settings, Dashboard, Sign Out/In */}
+          {/* Right: Controls - GRAYSCALE NAVIGATION BUTTONS */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Settings Button - Enhanced styling for admins */}
+            {/* Settings Button - GRAYSCALE */}
             <button
               onClick={handleSettingsClick}
               disabled={!isUserAdmin}
               className={`flex items-center justify-center rounded-lg p-2 transition-all ${
                 isUserAdmin
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white cursor-pointer shadow-lg hover:shadow-xl'
+                  ? 'bg-gray-500 hover:bg-gray-600 text-white cursor-pointer shadow-md hover:shadow-lg'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
               }`}
               title={isUserAdmin ? "Settings" : "Settings (Admin Only)"}
@@ -158,28 +150,20 @@ export default function Header({
               <SlidersIcon className="h-5 w-5 sm:h-5 sm:w-5" />
             </button>
 
-            {/* Dashboard Button - Matching gradient colors for admin */}
+            {/* Dashboard Button - GRAYSCALE */}
             <button
               onClick={() => setPage("dashboard")}
-              className={`flex items-center justify-center rounded-lg p-2 transition-all ${
-                isUserAdmin
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white cursor-pointer shadow-lg hover:shadow-xl'
-                  : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
-              }`}
+              className="flex items-center justify-center rounded-lg p-2 transition-all bg-gray-500 hover:bg-gray-600 text-white cursor-pointer shadow-md hover:shadow-lg"
               title="Dashboard"
             >
               <ChartIcon className="h-5 w-5" />
             </button>
 
-            {/* Sign Out/Sign In Button - Enhanced for admins */}
+            {/* Sign Out/Sign In Button - GRAYSCALE */}
             {user && !user.isAnonymous ? (
               <button
                 onClick={onSignOut}
-                className={`rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all ${
-                  isUserAdmin
-                    ? 'bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg'
-                    : 'bg-red-500 hover:bg-red-600 text-white'
-                }`}
+                className="rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all bg-gray-600 hover:bg-gray-700 text-white shadow-md hover:shadow-lg"
                 title="Sign Out"
               >
                 <LogOutIcon className="h-5 w-5" />
@@ -188,7 +172,7 @@ export default function Header({
               onSignIn && (
                 <button
                   onClick={onSignIn}
-                  className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all shadow-md hover:shadow-lg"
+                  className="bg-gray-500 hover:bg-gray-600 text-white rounded-lg p-2 flex items-center justify-center border-2 border-transparent transition-all shadow-md hover:shadow-lg"
                   title="Sign In with Google"
                 >
                   <UserIcon className="h-5 w-5" />

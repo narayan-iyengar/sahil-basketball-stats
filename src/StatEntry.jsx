@@ -61,30 +61,68 @@ export default function StatEntry({
     }));
   };
 
+  // FIXED: Stat change handler with corrected shooting logic
   const handleStatChange = (statName, delta) => {
     setStats(prev => {
       const newStats = { ...prev };
       const newValue = Math.max(0, prev[statName] + delta);
       newStats[statName] = newValue;
       
-      // Keep made <= attempted for shooting stats
-      if (statName === "fg2m" && newValue > prev.fg2a) {
-        newStats.fg2a = newValue;
+      // FIXED: Shot attempt logic - same as LiveGameAdmin
+      // For made shots - every increase/decrease in made should increase/decrease attempts
+      if (statName === "fg2m") {
+        if (delta > 0) {
+          // Increasing made shots - always increase attempts by the same amount
+          newStats.fg2a = prev.fg2a + delta;
+        } else if (delta < 0) {
+          // Decreasing made shots - decrease attempts but keep attempts >= made
+          newStats.fg2a = Math.max(newValue, prev.fg2a + delta);
+        }
       }
-      if (statName === "fg2a" && newValue < prev.fg2m) {
-        newStats.fg2m = newValue;
+      
+      if (statName === "fg3m") {
+        if (delta > 0) {
+          // Increasing made shots - always increase attempts by the same amount
+          newStats.fg3a = prev.fg3a + delta;
+        } else if (delta < 0) {
+          // Decreasing made shots - decrease attempts but keep attempts >= made
+          newStats.fg3a = Math.max(newValue, prev.fg3a + delta);
+        }
       }
-      if (statName === "fg3m" && newValue > prev.fg3a) {
-        newStats.fg3a = newValue;
+      
+      if (statName === "ftm") {
+        if (delta > 0) {
+          // Increasing made shots - always increase attempts by the same amount
+          newStats.fta = prev.fta + delta;
+        } else if (delta < 0) {
+          // Decreasing made shots - decrease attempts but keep attempts >= made
+          newStats.fta = Math.max(newValue, prev.fta + delta);
+        }
       }
-      if (statName === "fg3a" && newValue < prev.fg3m) {
-        newStats.fg3m = newValue;
+      
+      // For attempt shots - ensure made <= attempts
+      if (statName === "fg2a") {
+        if (delta < 0) {
+          // Decreasing attempts - ensure made doesn't exceed attempts
+          newStats.fg2m = Math.min(prev.fg2m, newValue);
+        }
+        // When increasing attempts, no need to change made shots
       }
-      if (statName === "ftm" && newValue > prev.fta) {
-        newStats.fta = newValue;
+      
+      if (statName === "fg3a") {
+        if (delta < 0) {
+          // Decreasing attempts - ensure made doesn't exceed attempts
+          newStats.fg3m = Math.min(prev.fg3m, newValue);
+        }
+        // When increasing attempts, no need to change made shots
       }
-      if (statName === "fta" && newValue < prev.ftm) {
-        newStats.ftm = newValue;
+      
+      if (statName === "fta") {
+        if (delta < 0) {
+          // Decreasing attempts - ensure made doesn't exceed attempts
+          newStats.ftm = Math.min(prev.ftm, newValue);
+        }
+        // When increasing attempts, no need to change made shots
       }
       
       return newStats;

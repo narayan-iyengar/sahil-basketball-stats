@@ -2,6 +2,24 @@ import React, { useEffect, useState, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { BasketballIcon } from "./icons";
 
+// Bench Icon - Person sitting on bench
+const BenchIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    {/* Person's head */}
+    <circle cx="8" cy="5" r="1.5" />
+    {/* Person's body */}
+    <rect x="6.5" y="7" width="3" height="3" rx="0.5" />
+    {/* Person's legs */}
+    <rect x="7" y="10" width="0.8" height="3" rx="0.4" />
+    <rect x="8.2" y="10" width="0.8" height="3" rx="0.4" />
+    {/* Bench seat */}
+    <rect x="3" y="9.5" width="14" height="1" rx="0.5" />
+    {/* Bench legs */}
+    <rect x="4" y="10.5" width="0.5" height="2" rx="0.25" />
+    <rect x="15.5" y="10.5" width="0.5" height="2" rx="0.25" />
+  </svg>
+);
+
 export default function LiveGameViewer({ db, gameId, user }) {
   const [game, setGame] = useState(null);
   const [error, setError] = useState(null);
@@ -138,7 +156,7 @@ export default function LiveGameViewer({ db, gameId, user }) {
             <h3 className="text-xl md:text-2xl font-bold truncate text-gray-900 dark:text-white">{game.teamName}</h3>
             <p className="text-5xl md:text-7xl font-mono text-gray-900 dark:text-white">{game.homeScore}</p>
           </div>
-<div className="w-1/3">
+          <div className="w-1/3">
             <div className="flex flex-col items-center">
               <p className={`text-4xl font-mono tracking-wider  text-gray-900 dark:text-white transition-all duration-300  ${
                 clockIsUrgent 
@@ -161,6 +179,19 @@ export default function LiveGameViewer({ db, gameId, user }) {
         </div>
       </div>
       
+      {/* Bench Status Indicator */}
+      {game.sahilOnBench && (
+        <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg text-center">
+          <div className="flex items-center justify-center gap-2 text-orange-700 dark:text-orange-300">
+            <BenchIcon className="w-6 h-6" />
+            <span className="text-sm font-medium">Sahil is on the bench</span>
+          </div>
+          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+            Stats will resume when he's back in the game
+          </p>
+        </div>
+      )}
+      
       {/* Viewer status message - SIMPLIFIED */}
       <div className="text-center text-gray-500 dark:text-gray-400 text-sm">
         <p>
@@ -172,19 +203,43 @@ export default function LiveGameViewer({ db, gameId, user }) {
       {/* Sahil Live Stats Card */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
         <div className="mb-2 flex items-center justify-center gap-2">
-          <span className="font-bold text-orange-500 text-lg">Live Stats</span>
+          <div className="flex items-center gap-1">
+            {game.sahilOnBench ? (
+              <BenchIcon className="w-5 h-5 text-orange-500" />
+            ) : (
+              <span className="text-lg">🏀</span>
+            )}
+            <span className="font-bold text-orange-500 text-lg">
+              {game.sahilOnBench ? "Bench Stats" : "Live Stats"}
+            </span>
+          </div>
+          {game.sahilOnBench && (
+            <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded">
+              On Bench
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {statCards.map(card => (
             <div
               key={card.label}
-              className="bg-gray-100 dark:bg-gray-900 rounded-lg p-3 flex flex-col items-center"
+              className={`rounded-lg p-3 flex flex-col items-center transition-opacity ${
+                game.sahilOnBench 
+                  ? 'bg-gray-50 dark:bg-gray-800 opacity-75' 
+                  : 'bg-gray-100 dark:bg-gray-900'
+              }`}
             >
               <span className="text-xs text-orange-500 font-semibold">{card.label}</span>
               <span className="text-xl font-bold text-gray-900 dark:text-gray-100">{card.value}</span>
             </div>
           ))}
         </div>
+        
+        {game.sahilOnBench && (
+          <div className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">
+            💡 Current stats shown - updates paused while on bench
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,23 @@
 import React from "react";
 
+// Bench Icon - Person sitting on bench
+export const BenchIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    {/* Person's head */}
+    <circle cx="8" cy="5" r="1.5" />
+    {/* Person's body */}
+    <rect x="6.5" y="7" width="3" height="3" rx="0.5" />
+    {/* Person's legs */}
+    <rect x="7" y="10" width="0.8" height="3" rx="0.4" />
+    <rect x="8.2" y="10" width="0.8" height="3" rx="0.4" />
+    {/* Bench seat */}
+    <rect x="3" y="9.5" width="14" height="1" rx="0.5" />
+    {/* Bench legs */}
+    <rect x="4" y="10.5" width="0.5" height="2" rx="0.25" />
+    <rect x="15.5" y="10.5" width="0.5" height="2" rx="0.25" />
+  </svg>
+);
+
 // Filter/Funnel Icon - NEW (back to funnel design)
 export const FilterIcon = ({ className = "" }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
