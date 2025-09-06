@@ -4,6 +4,7 @@ import { PlusIcon, TrashIcon, ChevronRightIcon, FilterIcon } from "./icons";
 import { getEarnedBadges, BadgeSummary, BadgeDisplay } from "./achievement_system";
 import { PhotoUpload, PhotoThumbnails } from "./photo_system";
 import FilterDropdown from "./FilterDropdown";
+import PointsBreakdownModal from "./PointsBreakdownModal";
 
 // Import admin utilities
 import { canDelete, canWrite, showAccessDenied } from "./utils/adminUtils";
@@ -63,34 +64,10 @@ const CheckIcon = ({ className = "" }) => (
   </svg>
 );
 
-
 // Expandable bar icon
 const ExpandableBar = ({ isExpanded, className = "" }) => (
   <div className={`w-12 h-1 bg-gray-400 rounded-full transition-all duration-200 ${isExpanded ? 'bg-orange-500' : ''} ${className}`} />
 );
-
-// Offline status badge for games
-const OfflineStatusBadge = ({ game }) => {
-  if (game.isOffline || game.tempId) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full font-medium" title="Saved offline, will sync when online">
-        <OfflineIcon className="w-3 h-3" />
-        <span className="hidden sm:inline">Offline</span>
-      </span>
-    );
-  }
-  
-  if (game.isOfflineUpdated) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full font-medium" title="Updated offline, will sync when online">
-        <CloudSyncIcon className="w-3 h-3" />
-        <span className="hidden sm:inline">Updated</span>
-      </span>
-    );
-  }
-  
-  return null;
-};
 
 // Card for stat values - now with editing capability
 const StatCard = ({ label, value, onClick, clickable, onEdit, editable, isEditing, editValue, onEditChange, onSave, onCancel, gameId }) => (
@@ -237,6 +214,10 @@ export default function Dashboard({
   
   const GAMES_PER_PAGE = 4;
 
+
+  const [pointsBreakdownGame, setPointsBreakdownGame] = useState(null);
+
+
   // Unique opponent suggestions
   const allOpponents = useMemo(() => {
     const oppSet = new Set();
@@ -273,10 +254,7 @@ export default function Dashboard({
       .slice(0, 7);
   }, [allOpponents, searchTerm]);
 
-  // Count offline/pending games
-  const offlineGamesCount = (stats || []).filter(game => game.isOffline || game.tempId || game.isOfflineUpdated).length;
-
-  // Aggregate stats - excluding offline/temp games from calculations
+  // Aggregate stats
   const aggregatedStats = (stats || [])
     .reduce((acc, game) => {
       acc.points = (acc.points || 0) + (parseInt(game.points, 10) || 0);
@@ -416,19 +394,16 @@ export default function Dashboard({
     }
   };
 
-  // Stat graph handler - exclude offline games from graphs
+  // Stat graph handler
   const handleStatClick = (statKey, statName) => {
-    // Filter out offline games for accurate historical data
-    const syncedGames = stats.filter(game => !game.isOffline && !game.tempId);
-    
     if (statKey === "gamesPlayed") {
       setGraphData({
         statKey,
         statName: "Games Played per Age",
-        data: groupGamesByAge(syncedGames),
+        data: groupGamesByAge(stats),
       });
     } else {
-      const data = [...syncedGames]
+      const data = [...stats]
         .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
         .map((game) => ({
           value:
@@ -547,25 +522,6 @@ export default function Dashboard({
     }
   };
 
-  // Manual sync handler
-  const handleSyncClick = () => {
-    if (!isUserAdmin || syncInProgress) return;
-    
-    if (!isOnline) {
-      alert("You're currently offline. Sync will happen automatically when you're back online.");
-      return;
-    }
-    
-    if (offlineGamesCount === 0) {
-      alert("No offline data to sync.");
-      return;
-    }
-    
-    if (onManualSync) {
-      onManualSync();
-    }
-  };
-
   // Helper to show zero for blank/undefined stat
   const showZero = (val) => (val === undefined || val === null || val === "" ? 0 : val);
 
@@ -600,6 +556,12 @@ export default function Dashboard({
       {graphData && (
         <StatGraphModal graphData={graphData} onClose={() => setGraphData(null)} />
       )}
+      {pointsBreakdownGame && (
+      <PointsBreakdownModal 
+        game={pointsBreakdownGame} 
+        onClose={() => setPointsBreakdownGame(null)} 
+      />
+    )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Career stats */}
         <div className="lg:col-span-1 space-y-6">
@@ -607,21 +569,6 @@ export default function Dashboard({
             <h3 className="text-xl font-bold mb-4 text-orange-500">
               Career Totals
             </h3>
-            
-            {/* Show offline data notice if there are offline games */}
-{offlineGamesCount > 0 && (
-  <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-800 dark:text-blue-200">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-1">
-        <OfflineIcon className="w-3 h-3" />
-        <span>{offlineGamesCount} game{offlineGamesCount !== 1 ? 's' : ''} saved offline</span>
-      </div>
-      <span className="text-blue-600 dark:text-blue-300">
-        Use settings to sync →
-      </span>
-    </div>
-  </div>
-)}
             
             <div className="grid grid-cols-3 gap-3 text-center">
               <StatCard
@@ -901,9 +848,6 @@ export default function Dashboard({
                                     Scored by {game.adminName}
                                   </p>
                                 )}
-                                
-                                {/* Offline status badge */}
-                                <OfflineStatusBadge game={game} />
                               </div>
                               
                               <BadgeSummary badges={earnedBadges} />
@@ -942,21 +886,6 @@ export default function Dashboard({
                         {/* Expanded view - only show when not in selection mode */}
                         {expanded && !isSelectionMode && (
                           <div className="p-4 pt-2 relative">
-                            {/* Show warning for offline/temp games */}
-                            {(game.isOffline || game.tempId || game.isOfflineUpdated) && (
-                              <div className="mb-4 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-sm">
-                                <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-                                  <OfflineIcon className="w-4 h-4" />
-                                  <span>
-                                    {game.isOffline || game.tempId 
-                                      ? "This game was created offline and will sync when online."
-                                      : "This game has offline updates that will sync when online."
-                                    }
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            
                             {/* Edit Controls for Expanded View - Only show for admins */}
                             {isUserAdmin && (
                               <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-600">
@@ -1110,6 +1039,8 @@ export default function Dashboard({
                               <StatCard
                                 label="Points"
                                 value={showZero(game.points)}
+                                clickable={true}
+                                onClick={() => setPointsBreakdownGame(game)}
                                 editable={isUserAdmin}
                                 isEditing={isEditing && editingField === 'stats' && editingStat === 'points'}
                                 editValue={editValues.points}
